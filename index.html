@@ -5390,10 +5390,26 @@
             updateAvailableFilterOptions();
             renderRoutes();
 
-            document.getElementById('startDate').addEventListener('change', () => {
-                updateAvailableFilterOptions();
-                renderRoutes();
-            });
+            document.getElementById('startDate').addEventListener('change', (e) => {
+    const startVal = e.target.value;
+    const endDateInput = document.getElementById('endDate');
+
+    if (startVal) {
+        // Setzt das Mindestdatum des Enddatum-Pickers auf das gewählte Startdatum
+        endDateInput.min = startVal;
+
+        // Falls das bereits gewählte Enddatum VOR dem neuen Startdatum liegt, zurücksetzen
+        if (endDateInput.value && endDateInput.value < startVal) {
+            endDateInput.value = startVal;
+        }
+    } else {
+        // Fallback: Wenn das Startdatum geleert wird, ursprüngliches min wiederherstellen
+        endDateInput.min = "2026-09-01";
+    }
+
+    updateAvailableFilterOptions();
+    renderRoutes();
+});
             document.getElementById('endDate').addEventListener('change', () => {
                 updateAvailableFilterOptions();
                 renderRoutes();
@@ -5563,6 +5579,8 @@
             document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
             document.getElementById('startDate').value = '';
             document.getElementById('endDate').value = '';
+
+            document.getElementById('endDate').min = '2026-09-01';
 
             document.getElementById('portFilterGroup').style.display = 'none';
 
