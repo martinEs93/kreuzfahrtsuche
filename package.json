@@ -1,0 +1,12 @@
+{
+  "name": "kreuzfahrtsuche-image-tools",
+  "version": "1.0.0",
+  "description": "Scripts to download and optimize external images referenced in index.html",
+  "scripts": {
+    "download-images": "node scripts/download_optimize_images.js"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "sharp": "^0.32.0"
+  }
+}
