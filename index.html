@@ -5386,41 +5386,48 @@
         ];
 
         document.addEventListener("DOMContentLoaded", () => {
-            initChips();
-            updateAvailableFilterOptions();
-            renderRoutes();
+   initChips();
+   updateAvailableFilterOptions();
+   renderRoutes();
 
-            document.getElementById('startDate').addEventListener('change', (e) => {
-    const startVal = e.target.value;
-    const endDateInput = document.getElementById('endDate');
+   const startDateInput = document.getElementById('startDate');
+   const endDateInput = document.getElementById('endDate');
 
-    if (startVal) {
-        // Setzt das Mindestdatum des Enddatum-Pickers auf das gewählte Startdatum
-        endDateInput.min = startVal;
+   function handleStartDateUpdate(e) {
+       const startVal = e.target.value;
 
-        // Falls das bereits gewählte Enddatum VOR dem neuen Startdatum liegt, zurücksetzen
-        if (endDateInput.value && endDateInput.value < startVal) {
-            endDateInput.value = startVal;
-        }
-    } else {
-        // Fallback: Wenn das Startdatum geleert wird, ursprüngliches min wiederherstellen
-        endDateInput.min = "2026-09-01";
-    }
+       if (startVal) {
+           endDateInput.min = startVal;
 
-    updateAvailableFilterOptions();
-    renderRoutes();
+           if (endDateInput.value && endDateInput.value < startVal) {
+               endDateInput.value = startVal;
+           }
+       } else {
+           endDateInput.min = "2026-09-01";
+       }
+
+       updateAvailableFilterOptions();
+       renderRoutes();
+   }
+
+   startDateInput.addEventListener('change', handleStartDateUpdate);
+   startDateInput.addEventListener('input', handleStartDateUpdate);
+
+   endDateInput.addEventListener('change', () => {
+       updateAvailableFilterOptions();
+       renderRoutes();
+   });
+   endDateInput.addEventListener('input', () => {
+       updateAvailableFilterOptions();
+       renderRoutes();
+   });
+
+   document.addEventListener('click', (e) => {
+       if (!e.target.closest('.custom-multiselect')) {
+           document.querySelectorAll('.checkboxes-dropdown').forEach(d => d.classList.remove('open'));
+       }
+   });
 });
-            document.getElementById('endDate').addEventListener('change', () => {
-                updateAvailableFilterOptions();
-                renderRoutes();
-            });
-
-            document.addEventListener('click', (e) => {
-                if (!e.target.closest('.custom-multiselect')) {
-                    document.querySelectorAll('.checkboxes-dropdown').forEach(d => d.classList.remove('open'));
-                }
-            });
-        });
 
         function initChips() {
             const container = document.getElementById('regionChips');
