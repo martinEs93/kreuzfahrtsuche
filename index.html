@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MSC Routensuche - Core Cruises</title>
     <link rel="icon" href="favicon.png" type="image/png">
+    <link rel="dns-prefetch" href="//i.postimg.cc">
+    <link rel="preconnect" href="https://i.postimg.cc" crossorigin>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @font-face {
@@ -126,18 +128,43 @@
         .btn-reset-all:hover { background: #cbd5e0; }
 
         .route-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:25px; }
-        .route-card { background:var(--card-bg); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.06); display:flex; flex-direction:column; transition:transform .2s, box-shadow .2s; border:1px solid var(--border); color:#2c3e50; }
-        .route-card:hover { transform:translateY(-4px); box-shadow:0 8px 24px rgba(0,0,0,0.12); }
+        .route-card { position:relative; background:var(--card-bg); border-radius:14px; overflow:hidden; box-shadow:0 5px 18px rgba(10,26,47,0.07); display:flex; flex-direction:column; transition:transform .2s, box-shadow .2s; border:1px solid var(--border); color:#2c3e50; content-visibility:auto; contain-intrinsic-size:auto 560px; }
+        .route-card::before { content:""; position:absolute; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg, #003366, #1a5f99); z-index:2; }
+        .route-card:hover { transform:translateY(-5px); box-shadow:0 12px 28px rgba(10,26,47,0.14); }
 
-        .card-header { padding:18px 20px 14px 20px; background:#fff; border-bottom:1px solid #f0f0f0; }
+        .results-toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0 0 18px; padding:14px 16px; border:1px solid var(--border); border-radius:12px; background:#fff; box-shadow:0 3px 12px rgba(10,26,47,0.04); }
+        .results-toolbar[hidden] { display:none; }
+        .results-summary { min-width:0; }
+        .result-count { margin:0; color:var(--primary); font-weight:700; }
+        .active-filters { display:flex; flex-wrap:wrap; gap:6px; margin-top:7px; }
+        .active-filter { display:inline-flex; align-items:center; padding:3px 8px; border-radius:99px; background:#edf2f7; color:#4a5568; font-size:12px; font-weight:600; }
+        .sort-label { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; color:#4a5568; }
+        .sort-select { padding:8px 10px; border:1px solid var(--border); border-radius:7px; background:#fff; color:#2c3e50; font:inherit; }
+
+        .card-header { padding:21px 20px 15px 20px; background:#fff; border-bottom:1px solid #f0f0f0; }
         .card-header h3 { margin:0; font-size:17px; color:var(--primary); line-height:1.3; font-weight:700; }
-        .image-container { position:relative; width:100%; height:200px; background:#fff; display:flex; align-items:center; justify-content:center; padding:5px; }
-        .image-container img { max-width:100%; max-height:100%; object-fit:contain; }
+        .image-container { position:relative; width:100%; height:200px; overflow:hidden; background:#fff; display:flex; align-items:center; justify-content:center; padding:5px; }
+        .image-container img { position:relative; z-index:1; width:100%; height:100%; max-width:100%; max-height:100%; object-fit:contain; opacity:1; transition:opacity .25s ease; }
+        .image-container.is-loading { background:#edf2f7; }
+        .image-container.is-loading::before { content:""; position:absolute; inset:0; background:linear-gradient(105deg, transparent 35%, rgba(255,255,255,.78) 50%, transparent 65%); transform:translateX(-100%); animation:image-shimmer 1.25s infinite; }
+        .image-container.is-loading img { opacity:0; }
+        @keyframes image-shimmer { to { transform:translateX(100%); } }
+        .image-container.image-unavailable { background:#f8fafc; color:#718096; }
+        .image-container.image-unavailable::after { content:"Bild derzeit nicht verfügbar"; font-size:13px; font-weight:600; }
 
-        .route-details-short { padding:15px 20px; flex-grow:1; font-size:14px; color:#2c3e50; }
-        .detail-row { display:flex; justify-content:space-between; margin-bottom:6px; padding-bottom:6px; border-bottom:1px dashed #f0f0f0; }
+        .load-more { grid-column:1/-1; display:flex; justify-content:center; padding:5px 0 10px; }
+        .btn-load-more { width:auto; min-width:220px; }
+
+        .route-details-short { padding:17px 20px; flex-grow:1; font-size:14px; color:#2c3e50; }
+        .detail-row { display:flex; justify-content:space-between; margin-bottom:7px; padding-bottom:7px; border-bottom:1px dashed #e2e8f0; }
         .detail-label { color:#4a5568; }
+        .detail-label i { width:18px; color:var(--primary); text-align:center; }
         .detail-value { font-weight:600; color:#2c3e50; }
+
+        .next-departure { display:flex; align-items:flex-start; gap:9px; margin:14px 0 12px; padding:10px 11px; border:1px solid #cfe0f2; border-radius:8px; background:#edf5fc; color:var(--primary); }
+        .next-departure i { margin-top:3px; }
+        .next-departure-label { display:block; font-size:11px; font-weight:700; letter-spacing:.35px; text-transform:uppercase; }
+        .next-departure-date { display:block; font-size:13px; font-weight:700; }
 
         .dates-container { margin-top:10px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:10px 12px; max-height:150px; overflow-y:auto; color:#2c3e50; }
         .dates-title { font-size:12px; font-weight:700; color:var(--primary); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
@@ -146,9 +173,10 @@
         .date-item-radio:last-child { border-bottom:none; }
         .date-item-radio input[type="radio"] { accent-color:var(--primary); width:15px; height:15px; cursor:pointer; }
 
-        .actions { padding:15px 20px; display:flex; flex-direction:column; gap:10px; background:#fafbfc; border-top:1px solid var(--border); }
+        .actions { padding:16px 20px 18px; display:flex; flex-direction:column; gap:10px; background:linear-gradient(180deg, #fafbfc 0%, #f5f8fb 100%); border-top:1px solid var(--border); }
         .actions .collapsed, .actions .expanded { display:flex; gap:10px; flex-direction:column; }
         .actions .expanded { display:none; }
+        .actions .btn-contact { min-height:46px; }
        
         .btn {
             display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
@@ -178,10 +206,17 @@
         }
         .btn-toggle:hover, .btn-hide:hover { background-color: #e2e8f0; }
 
-        .details-expanded { display:none; padding:15px 20px; background:#f8fafc; border-top:1px solid var(--border); font-size:14px; color:#2c3e50; line-height:1.6; }
+        .details-expanded { display:none; padding:18px 20px; background:#f8fafc; border-top:1px solid var(--border); font-size:14px; color:#2c3e50; line-height:1.6; }
         .details-expanded.open { display:block; }
+        .detail-section + .detail-section { margin-top:18px; padding-top:16px; border-top:1px dashed #dbe4ee; }
+        .detail-section h4 { display:flex; align-items:center; gap:8px; margin:0 0 7px; color:var(--primary); font-size:14px; }
+        .detail-section h4 i { color:#1a5f99; }
+        .detail-section p { margin:0; }
 
         .no-results { grid-column:1/-1; text-align:center; padding:24px 20px; background:#fff; border-radius:12px; color:#4a5568; font-size:15px; border:1px dashed var(--border); }
+        .back-to-top { position:fixed; right:22px; bottom:22px; z-index:50; display:grid; place-items:center; width:46px; height:46px; border:0; border-radius:50%; background:linear-gradient(135deg, #003366 0%, #001f3f 100%); color:#fff; cursor:pointer; box-shadow:0 5px 16px rgba(0,31,63,.28); opacity:0; visibility:hidden; transform:translateY(10px); transition:opacity .2s, transform .2s, visibility .2s; }
+        .back-to-top.visible { opacity:1; visibility:visible; transform:translateY(0); }
+        .back-to-top:hover { transform:translateY(-2px); }
 
         /* FOOTER */
         footer { background-color:var(--header-footer-bg); color:var(--header-footer-text); padding:30px 20px; margin-top:auto; }
@@ -200,6 +235,9 @@
             .filter-grid-2col { grid-template-columns:1fr; }
             .date-range-container { flex-direction:column; align-items:flex-start; }
             .route-grid { grid-template-columns:1fr; }
+            .results-toolbar { align-items:stretch; flex-direction:column; }
+            .sort-label { justify-content:space-between; }
+            .back-to-top { right:15px; bottom:15px; }
             .footer-links { flex-direction:column; gap:10px; }
         }
 
@@ -256,11 +294,11 @@
                     <div class="date-range-container">
                         <div class="date-input-wrapper">
                             <span>Von:</span>
-                            <input type="date" id="startDate" min="2026-09-01" max="2028-11-30" />
+                            <input type="date" id="startDate" max="2028-11-30" />
                         </div>
                         <div class="date-input-wrapper">
                             <span>Bis:</span>
-                            <input type="date" id="endDate" min="2026-09-01" max="2028-11-30" />
+                            <input type="date" id="endDate" max="2028-11-30" />
                         </div>
                     </div>
                 </div>
@@ -306,6 +344,22 @@
                 </div>
             </div>
 
+            <div class="results-toolbar" id="resultsToolbar" hidden>
+                <div class="results-summary">
+                    <p class="result-count" id="resultCount" aria-live="polite"></p>
+                    <div class="active-filters" id="activeFilters" aria-label="Aktive Filter"></div>
+                </div>
+                <label class="sort-label" for="sortRoutes">
+                    Sortieren nach:
+                    <select class="sort-select" id="sortRoutes">
+                        <option value="earliest">Früheste Abfahrt</option>
+                        <option value="duration-asc">Kürzeste Reisedauer</option>
+                        <option value="duration-desc">Längste Reisedauer</option>
+                        <option value="port">Abfahrtshafen A–Z</option>
+                    </select>
+                </label>
+            </div>
+
             <div class="route-grid" id="routeGrid"></div>
         </div>
     </main>
@@ -326,9 +380,25 @@
         </div>
     </footer>
 
+    <button class="back-to-top" id="backToTop" type="button" aria-label="Zum Seitenanfang" title="Zum Seitenanfang">
+        <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+    </button>
+
     <script>
         const MY_PHONE_NUMBER = "493083199468";
         const MY_EMAIL = "kontakt@corecruises.de";
+
+        // Liefert das heutige Datum in der lokalen Zeitzone als YYYY-MM-DD.
+        // Dadurch bleiben Abfahrten von heute sichtbar, vergangene verschwinden automatisch.
+        function getTodayISO() {
+            const today = new Date();
+            const offset = today.getTimezoneOffset();
+            return new Date(today.getTime() - offset * 60 * 1000).toISOString().slice(0, 10);
+        }
+
+        function isUpcomingDeparture(departure) {
+            return departure.start >= getTodayISO();
+        }
 
         const regionPortsData = {
             "Mittelmeer": ["Alicante","Ancona","Bari","Barcelona","Brindisi","Cagliari","Cannes","Civitavecchia","Genua","Istanbul","Kusadasi","La Spezia","Lissabon","Livorno","Málaga","Marseille","Messina","Neapel","Palermo","Valletta"],
@@ -354,6 +424,8 @@
         let selectedPorts = [];
         let selectedShips = [];
         let selectedDurations = [];
+        const ROUTES_PER_PAGE = 12;
+        let visibleRoutes = ROUTES_PER_PAGE;
 
         const routesData = [
             {
@@ -367,28 +439,28 @@
     shipInfo: "Die MSC Euribia ist eines der modernsten Schiffe von MSC Cruises mit LNG-Antrieb und innovativer Umwelttechnik. An Bord erwartet Sie eine beeindruckende zweideckige Innenpromenade unter einem riesigen LED-Himmel sowie ein großer Wasserpark mit mehreren Rutschen. Zudem finden Sie an Bord erstklassige Spezialitätenrestaurants und vielfältiges Entertainment für jedes Alter.",
     fullRoute: "Tag 1: Genua (Abfahrt 17:00) | Tag 2: Neapel (13:00–20:00) | Tag 3: Palermo (09:00–18:00) | Tag 4: La Goulette (09:00–18:00) | Tag 5: Seetag | Tag 6: Barcelona (08:00–18:00) | Tag 7: Marseille (09:00–18:00) | Tag 8: Genua (Ankunft 09:00)",
     departures: [
-      { start: "2026-10-26", end: "2026-11-02", label: "Mo. 26 Okt. - Mo. 02 Nov. 2026", price: "€719p.P." },
-      { start: "2026-11-02", end: "2026-11-09", label: "Mo. 02 Nov. - Mo. 09 Nov. 2026", price: "€599p.P." },
-      { start: "2026-11-09", end: "2026-11-16", label: "Mo. 09 Nov. - Mo. 16 Nov. 2026", price: "€499p.P." },
-      { start: "2026-11-16", end: "2026-11-23", label: "Mo. 16 Nov. - Mo. 23 Nov. 2026", price: "€549p.P." },
-      { start: "2026-11-23", end: "2026-11-30", label: "Mo. 23 Nov. - Mo. 30 Nov. 2026", price: "€599p.P." },
-      { start: "2026-12-07", end: "2026-12-14", label: "Mo. 07 Dez. - Mo. 14 Dez. 2026", price: "€649p.P." },
-      { start: "2026-12-14", end: "2026-12-21", label: "Mo. 14 Dez. - Mo. 21 Dez. 2026", price: "€629p.P." },
-      { start: "2026-12-21", end: "2026-12-28", label: "Mo. 21 Dez. - Mo. 28 Dez. 2026", price: "€799p.P." },
-      { start: "2026-12-28", end: "2027-01-04", label: "Mo. 28 Dez. - Mo. 04 Jan. 2027", price: "€1.239p.P." },
-      { start: "2027-01-04", end: "2027-01-11", label: "Mo. 04 Jan. - Mo. 11 Jan. 2027", price: "€769p.P." },
-      { start: "2027-01-11", end: "2027-01-18", label: "Mo. 11 Jan. - Mo. 18 Jan. 2027", price: "€559p.P." },
-      { start: "2027-01-18", end: "2027-01-25", label: "Mo. 18 Jan. - Mo. 25 Jan. 2027", price: "€689p.P." },
-      { start: "2027-01-25", end: "2027-02-01", label: "Mo. 25 Jan. - Mo. 01 Feb. 2027", price: "€569p.P." },
-      { start: "2027-02-01", end: "2027-02-08", label: "Mo. 01 Feb. - Mo. 08 Feb. 2027", price: "€599p.P." },
-      { start: "2027-02-08", end: "2027-02-15", label: "Mo. 08 Feb. - Mo. 15 Feb. 2027", price: "€539p.P." },
-      { start: "2027-02-15", end: "2027-02-22", label: "Mo. 15 Feb. - Mo. 22 Feb. 2027", price: "€599p.P." },
-      { start: "2027-02-22", end: "2027-03-01", label: "Mo. 22 Feb. - Mo. 01 März 2027", price: "€699p.P." },
-      { start: "2027-03-01", end: "2027-03-08", label: "Mo. 01 März - Mo. 08 März 2027", price: "€679p.P." },
-      { start: "2027-03-08", end: "2027-03-15", label: "Mo. 08 März - Mo. 15 März 2027", price: "€619p.P." },
-      { start: "2027-03-15", end: "2027-03-22", label: "Mo. 15 März - Mo. 22 März 2027", price: "€699p.P." },
-      { start: "2027-03-22", end: "2027-03-29", label: "Mo. 22 März - Mo. 29 März 2027", price: "€819p.P." },
-      { start: "2027-03-29", end: "2027-04-05", label: "Mo. 29 März - Mo. 05 Apr. 2027", price: "€779p.P." }
+      { start: "2026-10-26", end: "2026-11-02", label: "Mo. 26 Okt. - Mo. 02 Nov. 2026" },
+      { start: "2026-11-02", end: "2026-11-09", label: "Mo. 02 Nov. - Mo. 09 Nov. 2026" },
+      { start: "2026-11-09", end: "2026-11-16", label: "Mo. 09 Nov. - Mo. 16 Nov. 2026" },
+      { start: "2026-11-16", end: "2026-11-23", label: "Mo. 16 Nov. - Mo. 23 Nov. 2026" },
+      { start: "2026-11-23", end: "2026-11-30", label: "Mo. 23 Nov. - Mo. 30 Nov. 2026" },
+      { start: "2026-12-07", end: "2026-12-14", label: "Mo. 07 Dez. - Mo. 14 Dez. 2026" },
+      { start: "2026-12-14", end: "2026-12-21", label: "Mo. 14 Dez. - Mo. 21 Dez. 2026" },
+      { start: "2026-12-21", end: "2026-12-28", label: "Mo. 21 Dez. - Mo. 28 Dez. 2026" },
+      { start: "2026-12-28", end: "2027-01-04", label: "Mo. 28 Dez. - Mo. 04 Jan. 2027" },
+      { start: "2027-01-04", end: "2027-01-11", label: "Mo. 04 Jan. - Mo. 11 Jan. 2027" },
+      { start: "2027-01-11", end: "2027-01-18", label: "Mo. 11 Jan. - Mo. 18 Jan. 2027" },
+      { start: "2027-01-18", end: "2027-01-25", label: "Mo. 18 Jan. - Mo. 25 Jan. 2027" },
+      { start: "2027-01-25", end: "2027-02-01", label: "Mo. 25 Jan. - Mo. 01 Feb. 2027" },
+      { start: "2027-02-01", end: "2027-02-08", label: "Mo. 01 Feb. - Mo. 08 Feb. 2027" },
+      { start: "2027-02-08", end: "2027-02-15", label: "Mo. 08 Feb. - Mo. 15 Feb. 2027" },
+      { start: "2027-02-15", end: "2027-02-22", label: "Mo. 15 Feb. - Mo. 22 Feb. 2027" },
+      { start: "2027-02-22", end: "2027-03-01", label: "Mo. 22 Feb. - Mo. 01 März 2027" },
+      { start: "2027-03-01", end: "2027-03-08", label: "Mo. 01 März - Mo. 08 März 2027" },
+      { start: "2027-03-08", end: "2027-03-15", label: "Mo. 08 März - Mo. 15 März 2027" },
+      { start: "2027-03-15", end: "2027-03-22", label: "Mo. 15 März - Mo. 22 März 2027" },
+      { start: "2027-03-22", end: "2027-03-29", label: "Mo. 22 März - Mo. 29 März 2027" },
+      { start: "2027-03-29", end: "2027-04-05", label: "Mo. 29 März - Mo. 05 Apr. 2027" }
     ]
   },
   {
@@ -454,25 +526,25 @@
     shipInfo: "Spektakuläres Schiff der World-Klasse mit zukunftsweisendem Design und fantastischer kulinarischer Vielfalt. Mit der beeindruckenden Außenseite am Heck, exklusiven Spezialitätenrestaurants und innovativen Erlebniswelten setzt das Schiff Maßstäbe für Familien und Genießer. Auch der größte MSC Yacht Club der Flotte bietet hier exklusive Privatsphäre im Schiff-im-Schiff-Konzept.",
     fullRoute: "Tag 1: Barcelona (Abfahrt 18:00) | Tag 2: Marseille (08:00–18:00) | Tag 3: Genua (08:00–18:00) | Tag 4: Civitavecchia (07:00–18:00) | Tag 5: Messina (12:00–20:00) | Tag 6: Valletta (09:00–17:00) | Tag 7: Seetag | Tag 8: Barcelona (Ankunft 08:00)",
     departures: [
-      { start: "2026-12-04", end: "2026-12-11", label: "Fr. 04 Dez. - Fr. 11 Dez. 2026", price: "€989p.P." },
-      { start: "2026-12-11", end: "2026-12-18", label: "Fr. 11 Dez. - Fr. 18 Dez. 2026", price: "€789p.P." },
-      { start: "2026-12-18", end: "2026-12-25", label: "Fr. 18 Dez. - Fr. 25 Dez. 2026", price: "€819p.P." },
-      { start: "2026-12-25", end: "2027-01-01", label: "Fr. 25 Dez. - Fr. 01 Jan. 2027", price: "€1.519p.P." },
-      { start: "2027-01-01", end: "2027-01-08", label: "Fr. 01 Jan. - Fr. 08 Jan. 2027", price: "€969p.P." },
-      { start: "2027-01-08", end: "2027-01-15", label: "Fr. 08 Jan. - Fr. 15 Jan. 2027", price: "€699p.P." },
-      { start: "2027-01-15", end: "2027-01-22", label: "Fr. 15 Jan. - Fr. 22 Jan. 2027", price: "€769p.P." },
-      { start: "2027-01-22", end: "2027-01-29", label: "Fr. 22 Jan. - Fr. 29 Jan. 2027", price: "€729p.P." },
-      { start: "2027-01-29", end: "2027-02-05", label: "Fr. 29 Jan. - Fr. 05 Feb. 2027", price: "€689p.P." },
-      { start: "2027-02-05", end: "2027-02-12", label: "Fr. 05 Feb. - Fr. 12 Feb. 2027", price: "€799p.P." },
-      { start: "2027-02-12", end: "2027-02-19", label: "Fr. 12 Feb. - Fr. 19 Feb. 2027", price: "€749p.P." },
-      { start: "2027-02-19", end: "2027-02-26", label: "Fr. 19 Feb. - Fr. 26 Feb. 2027", price: "€859p.P." },
-      { start: "2027-02-26", end: "2027-03-05", label: "Fr. 26 Feb. - Fr. 05 März 2027", price: "€739p.P." },
-      { start: "2027-03-05", end: "2027-03-12", label: "Fr. 05 März - Fr. 12 März 2027", price: "€849p.P." },
-      { start: "2027-03-12", end: "2027-03-19", label: "Fr. 12 März - Fr. 19 März 2027", price: "€859p.P." },
-      { start: "2027-03-19", end: "2027-03-26", label: "Fr. 19 März - Fr. 26 März 2027", price: "€1.069p.P." },
-      { start: "2027-03-26", end: "2027-04-02", label: "Fr. 26 März - Fr. 02 Apr. 2027", price: "€1.049p.P." },
-      { start: "2027-04-02", end: "2027-04-09", label: "Fr. 02 Apr. - Fr. 09 Apr. 2027", price: "€1.049p.P." },
-      { start: "2027-04-09", end: "2027-04-16", label: "Fr. 09 Apr. - Fr. 16 Apr. 2027", price: "€1.049p.P." }
+      { start: "2026-12-04", end: "2026-12-11", label: "Fr. 04 Dez. - Fr. 11 Dez. 2026" },
+      { start: "2026-12-11", end: "2026-12-18", label: "Fr. 11 Dez. - Fr. 18 Dez. 2026" },
+      { start: "2026-12-18", end: "2026-12-25", label: "Fr. 18 Dez. - Fr. 25 Dez. 2026" },
+      { start: "2026-12-25", end: "2027-01-01", label: "Fr. 25 Dez. - Fr. 01 Jan. 2027" },
+      { start: "2027-01-01", end: "2027-01-08", label: "Fr. 01 Jan. - Fr. 08 Jan. 2027" },
+      { start: "2027-01-08", end: "2027-01-15", label: "Fr. 08 Jan. - Fr. 15 Jan. 2027" },
+      { start: "2027-01-15", end: "2027-01-22", label: "Fr. 15 Jan. - Fr. 22 Jan. 2027" },
+      { start: "2027-01-22", end: "2027-01-29", label: "Fr. 22 Jan. - Fr. 29 Jan. 2027" },
+      { start: "2027-01-29", end: "2027-02-05", label: "Fr. 29 Jan. - Fr. 05 Feb. 2027" },
+      { start: "2027-02-05", end: "2027-02-12", label: "Fr. 05 Feb. - Fr. 12 Feb. 2027" },
+      { start: "2027-02-12", end: "2027-02-19", label: "Fr. 12 Feb. - Fr. 19 Feb. 2027" },
+      { start: "2027-02-19", end: "2027-02-26", label: "Fr. 19 Feb. - Fr. 26 Feb. 2027" },
+      { start: "2027-02-26", end: "2027-03-05", label: "Fr. 26 Feb. - Fr. 05 März 2027" },
+      { start: "2027-03-05", end: "2027-03-12", label: "Fr. 05 März - Fr. 12 März 2027" },
+      { start: "2027-03-12", end: "2027-03-19", label: "Fr. 12 März - Fr. 19 März 2027" },
+      { start: "2027-03-19", end: "2027-03-26", label: "Fr. 19 März - Fr. 26 März 2027" },
+      { start: "2027-03-26", end: "2027-04-02", label: "Fr. 26 März - Fr. 02 Apr. 2027" },
+      { start: "2027-04-02", end: "2027-04-09", label: "Fr. 02 Apr. - Fr. 09 Apr. 2027" },
+      { start: "2027-04-09", end: "2027-04-16", label: "Fr. 09 Apr. - Fr. 16 Apr. 2027" }
     ]
   },
   {
@@ -486,35 +558,35 @@
     shipInfo: "Das klassisch-elegante Schiff beeindruckt bereits beim Betreten durch einen dreistufigen Wasserfall im transparenten Atrium. Zahlreiche Balkonkabinen, feine Spezialitäten-Sushibars und abwechslungsreiches Live-Entertainment sorgen für rundum gelungene Urlaubstage.",
     fullRoute: "Tag 1: Genua (Abfahrt 17:00) | Tag 2: Civitavecchia (08:00–19:00) | Tag 3: Palermo (11:00–20:00) | Tag 4: Seetag | Tag 5: Ibiza (12:30–23:00) | Tag 6: Valencia (07:00–16:00) | Tag 7: Marseille (13:00–19:00) | Tag 8: Genua (Ankunft 09:00)",
     departures: [
-      { start: "2027-04-17", end: "2027-04-24", label: "Sa. 17 Apr. - Sa. 24 Apr. 2027", price: "€719p.P." },
-      { start: "2027-04-24", end: "2027-05-01", label: "Sa. 24 Apr. - Sa. 01 Mai 2027", price: "€779p.P." },
-      { start: "2027-05-01", end: "2027-05-08", label: "Sa. 01 Mai - Sa. 08 Mai 2027", price: "€789p.P." },
-      { start: "2027-05-08", end: "2027-05-15", label: "Sa. 08 Mai - Sa. 15 Mai 2027", price: "€819p.P." },
-      { start: "2027-05-15", end: "2027-05-22", label: "Sa. 15 Mai - Sa. 22 Mai 2027", price: "€799p.P." },
-      { start: "2027-05-22", end: "2027-05-29", label: "Sa. 22 Mai - Sa. 29 Mai 2027", price: "€799p.P." },
-      { start: "2027-05-29", end: "2027-06-05", label: "Sa. 29 Mai - Sa. 05 Juni 2027", price: "€889p.P." },
-      { start: "2027-06-05", end: "2027-06-12", label: "Sa. 05 Juni - Sa. 12 Juni 2027", price: "€859p.P." },
-      { start: "2027-06-12", end: "2027-06-19", label: "Sa. 12 Juni - Sa. 19 Juni 2027", price: "€929p.P." },
-      { start: "2027-06-19", end: "2027-06-26", label: "Sa. 19 Juni - Sa. 26 Juni 2027", price: "€949p.P." },
-      { start: "2027-06-26", end: "2027-07-03", label: "Sa. 26 Juni - Sa. 03 Juli 2027", price: "€989p.P." },
-      { start: "2027-07-03", end: "2027-07-10", label: "Sa. 03 Juli - Sa. 10 Juli 2027", price: "€1.009p.P." },
-      { start: "2027-07-10", end: "2027-07-17", label: "Sa. 10 Juli - Sa. 17 Juli 2027", price: "€1.029p.P." },
-      { start: "2027-07-17", end: "2027-07-24", label: "Sa. 17 Juli - Sa. 24 Juli 2027", price: "€1.029p.P." },
-      { start: "2027-07-24", end: "2027-07-31", label: "Sa. 24 Juli - Sa. 31 Juli 2027", price: "€1.059p.P." },
-      { start: "2027-07-31", end: "2027-08-07", label: "Sa. 31 Juli - Sa. 07 Aug. 2027", price: "€1.139p.P." },
-      { start: "2027-08-07", end: "2027-08-14", label: "Sa. 07 Aug. - Sa. 14 Aug. 2027", price: "€1.179p.P." },
-      { start: "2027-08-14", end: "2027-08-21", label: "Sa. 14 Aug. - Sa. 21 Aug. 2027", price: "€1.179p.P." },
-      { start: "2027-08-21", end: "2027-08-28", label: "Sa. 21 Aug. - Sa. 28 Aug. 2027", price: "€1.129p.P." },
-      { start: "2027-08-28", end: "2027-09-04", label: "Sa. 28 Aug. - Sa. 04 Sept. 2027", price: "€1.069p.P." },
-      { start: "2027-09-04", end: "2027-09-11", label: "Sa. 04 Sept. - Sa. 11 Sept. 2027", price: "€1.049p.P." },
-      { start: "2027-09-11", end: "2027-09-18", label: "Sa. 11 Sept. - Sa. 18 Sept. 2027", price: "€969p.P." },
-      { start: "2027-09-18", end: "2027-09-25", label: "Sa. 18 Sept. - Sa. 25 Sept. 2027", price: "€909p.P." },
-      { start: "2027-09-25", end: "2027-10-02", label: "Sa. 25 Sept. - Sa. 02 Okt. 2027", price: "€879p.P." },
-      { start: "2027-10-02", end: "2027-10-09", label: "Sa. 02 Okt. - Sa. 09 Okt. 2027", price: "€819p.P." },
-      { start: "2027-10-09", end: "2027-10-16", label: "Sa. 09 Okt. - Sa. 16 Okt. 2027", price: "€789p.P." },
-      { start: "2027-10-16", end: "2027-10-23", label: "Sa. 16 Okt. - Sa. 23 Okt. 2027", price: "€789p.P." },
-      { start: "2027-10-23", end: "2027-10-30", label: "Sa. 23 Okt. - Sa. 30 Okt. 2027", price: "€789p.P." },
-      { start: "2027-10-30", end: "2027-11-06", label: "Sa. 30 Okt. - Sa. 06 Nov. 2027", price: "€789p.P." }
+      { start: "2027-04-17", end: "2027-04-24", label: "Sa. 17 Apr. - Sa. 24 Apr. 2027" },
+      { start: "2027-04-24", end: "2027-05-01", label: "Sa. 24 Apr. - Sa. 01 Mai 2027" },
+      { start: "2027-05-01", end: "2027-05-08", label: "Sa. 01 Mai - Sa. 08 Mai 2027" },
+      { start: "2027-05-08", end: "2027-05-15", label: "Sa. 08 Mai - Sa. 15 Mai 2027" },
+      { start: "2027-05-15", end: "2027-05-22", label: "Sa. 15 Mai - Sa. 22 Mai 2027" },
+      { start: "2027-05-22", end: "2027-05-29", label: "Sa. 22 Mai - Sa. 29 Mai 2027" },
+      { start: "2027-05-29", end: "2027-06-05", label: "Sa. 29 Mai - Sa. 05 Juni 2027" },
+      { start: "2027-06-05", end: "2027-06-12", label: "Sa. 05 Juni - Sa. 12 Juni 2027" },
+      { start: "2027-06-12", end: "2027-06-19", label: "Sa. 12 Juni - Sa. 19 Juni 2027" },
+      { start: "2027-06-19", end: "2027-06-26", label: "Sa. 19 Juni - Sa. 26 Juni 2027" },
+      { start: "2027-06-26", end: "2027-07-03", label: "Sa. 26 Juni - Sa. 03 Juli 2027" },
+      { start: "2027-07-03", end: "2027-07-10", label: "Sa. 03 Juli - Sa. 10 Juli 2027" },
+      { start: "2027-07-10", end: "2027-07-17", label: "Sa. 10 Juli - Sa. 17 Juli 2027" },
+      { start: "2027-07-17", end: "2027-07-24", label: "Sa. 17 Juli - Sa. 24 Juli 2027" },
+      { start: "2027-07-24", end: "2027-07-31", label: "Sa. 24 Juli - Sa. 31 Juli 2027" },
+      { start: "2027-07-31", end: "2027-08-07", label: "Sa. 31 Juli - Sa. 07 Aug. 2027" },
+      { start: "2027-08-07", end: "2027-08-14", label: "Sa. 07 Aug. - Sa. 14 Aug. 2027" },
+      { start: "2027-08-14", end: "2027-08-21", label: "Sa. 14 Aug. - Sa. 21 Aug. 2027" },
+      { start: "2027-08-21", end: "2027-08-28", label: "Sa. 21 Aug. - Sa. 28 Aug. 2027" },
+      { start: "2027-08-28", end: "2027-09-04", label: "Sa. 28 Aug. - Sa. 04 Sept. 2027" },
+      { start: "2027-09-04", end: "2027-09-11", label: "Sa. 04 Sept. - Sa. 11 Sept. 2027" },
+      { start: "2027-09-11", end: "2027-09-18", label: "Sa. 11 Sept. - Sa. 18 Sept. 2027" },
+      { start: "2027-09-18", end: "2027-09-25", label: "Sa. 18 Sept. - Sa. 25 Sept. 2027" },
+      { start: "2027-09-25", end: "2027-10-02", label: "Sa. 25 Sept. - Sa. 02 Okt. 2027" },
+      { start: "2027-10-02", end: "2027-10-09", label: "Sa. 02 Okt. - Sa. 09 Okt. 2027" },
+      { start: "2027-10-09", end: "2027-10-16", label: "Sa. 09 Okt. - Sa. 16 Okt. 2027" },
+      { start: "2027-10-16", end: "2027-10-23", label: "Sa. 16 Okt. - Sa. 23 Okt. 2027" },
+      { start: "2027-10-23", end: "2027-10-30", label: "Sa. 23 Okt. - Sa. 30 Okt. 2027" },
+      { start: "2027-10-30", end: "2027-11-06", label: "Sa. 30 Okt. - Sa. 06 Nov. 2027" }
     ]
   },
   {
@@ -528,26 +600,26 @@
     shipInfo: "Ein futuristisches Schiff der World-Klasse mit innovativem Y-Design, LNG-Antrieb und der beeindruckenden Outdoor-Promenade. Höhepunkte sind die spektakuläre 11-Decks-Trockenrutsche „Venom Drop“, ein riesiger Wasserpark sowie erstklassige Spezialitätenrestaurants für höchste kulinarische Ansprüche.",
     fullRoute: "Tag 1: Barcelona (Abfahrt 18:00) | Tag 2: Marseille (08:00–18:00) | Tag 3: Genua (08:00–18:00) | Tag 4: Civitavecchia (07:00–18:00) | Tag 5: Messina (12:00–20:00) | Tag 6: Valletta (09:00–17:00) | Tag 7: Seetag | Tag 8: Barcelona (Ankunft 08:00)",
     departures: [
-      { start: "2027-11-26", end: "2027-12-03", label: "Fr. 26 Nov. - Fr. 03 Dez. 2027", price: "€869p.P." },
-      { start: "2027-12-03", end: "2027-12-10", label: "Fr. 03 Dez. - Fr. 10 Dez. 2027", price: "€839p.P." },
-      { start: "2027-12-10", end: "2027-12-17", label: "Fr. 10 Dez. - Fr. 17 Dez. 2027", price: "€779p.P." },
-      { start: "2027-12-17", end: "2027-12-24", label: "Fr. 17 Dez. - Fr. 24 Dez. 2027", price: "€1.099p.P." },
-      { start: "2027-12-24", end: "2027-12-31", label: "Fr. 24 Dez. - Fr. 31 Dez. 2027", price: "€1.239p.P." },
-      { start: "2027-12-31", end: "2028-01-07", label: "Fr. 31 Dez. - Fr. 07 Jan. 2028", price: "€1.569p.P." },
-      { start: "2028-01-07", end: "2028-01-14", label: "Fr. 07 Jan. - Fr. 14 Jan. 2028", price: "€919p.P." },
-      { start: "2028-01-14", end: "2028-01-21", label: "Fr. 14 Jan. - Fr. 21 Jan. 2028", price: "€799p.P." },
-      { start: "2028-01-21", end: "2028-01-28", label: "Fr. 21 Jan. - Fr. 28 Jan. 2028", price: "€739p.P." },
-      { start: "2028-01-28", end: "2028-02-04", label: "Fr. 28 Jan. - Fr. 04 Feb. 2028", price: "€809p.P." },
-      { start: "2028-02-04", end: "2028-02-11", label: "Fr. 04 Feb. - Fr. 11 Feb. 2028", price: "€809p.P." },
-      { start: "2028-02-11", end: "2028-02-18", label: "Fr. 11 Feb. - Fr. 18 Feb. 2028", price: "€839p.P." },
-      { start: "2028-02-18", end: "2028-02-25", label: "Fr. 18 Feb. - Fr. 25 Feb. 2028", price: "€849p.P." },
-      { start: "2028-02-25", end: "2028-03-03", label: "Fr. 25 Feb. - Fr. 03 März 2028", price: "€829p.P." },
-      { start: "2028-03-03", end: "2028-03-10", label: "Fr. 03 März - Fr. 10 März 2028", price: "€829p.P." },
-      { start: "2028-03-10", end: "2028-03-17", label: "Fr. 10 März - Fr. 17 März 2028", price: "€899p.P." },
-      { start: "2028-03-17", end: "2028-03-24", label: "Fr. 17 März - Fr. 24 März 2028", price: "€939p.P." },
-      { start: "2028-03-24", end: "2028-03-31", label: "Fr. 24 März - Fr. 31 März 2028", price: "€879p.P." },
-      { start: "2028-03-31", end: "2028-04-07", label: "Fr. 31 März - Fr. 07 Apr. 2028", price: "€919p.P." },
-      { start: "2028-04-14", end: "2028-04-21", label: "Fr. 14 Apr. - Fr. 21 Apr. 2028", price: "€1.149p.P." }
+      { start: "2027-11-26", end: "2027-12-03", label: "Fr. 26 Nov. - Fr. 03 Dez. 2027" },
+      { start: "2027-12-03", end: "2027-12-10", label: "Fr. 03 Dez. - Fr. 10 Dez. 2027" },
+      { start: "2027-12-10", end: "2027-12-17", label: "Fr. 10 Dez. - Fr. 17 Dez. 2027" },
+      { start: "2027-12-17", end: "2027-12-24", label: "Fr. 17 Dez. - Fr. 24 Dez. 2027" },
+      { start: "2027-12-24", end: "2027-12-31", label: "Fr. 24 Dez. - Fr. 31 Dez. 2027" },
+      { start: "2027-12-31", end: "2028-01-07", label: "Fr. 31 Dez. - Fr. 07 Jan. 2028" },
+      { start: "2028-01-07", end: "2028-01-14", label: "Fr. 07 Jan. - Fr. 14 Jan. 2028" },
+      { start: "2028-01-14", end: "2028-01-21", label: "Fr. 14 Jan. - Fr. 21 Jan. 2028" },
+      { start: "2028-01-21", end: "2028-01-28", label: "Fr. 21 Jan. - Fr. 28 Jan. 2028" },
+      { start: "2028-01-28", end: "2028-02-04", label: "Fr. 28 Jan. - Fr. 04 Feb. 2028" },
+      { start: "2028-02-04", end: "2028-02-11", label: "Fr. 04 Feb. - Fr. 11 Feb. 2028" },
+      { start: "2028-02-11", end: "2028-02-18", label: "Fr. 11 Feb. - Fr. 18 Feb. 2028" },
+      { start: "2028-02-18", end: "2028-02-25", label: "Fr. 18 Feb. - Fr. 25 Feb. 2028" },
+      { start: "2028-02-25", end: "2028-03-03", label: "Fr. 25 Feb. - Fr. 03 März 2028" },
+      { start: "2028-03-03", end: "2028-03-10", label: "Fr. 03 März - Fr. 10 März 2028" },
+      { start: "2028-03-10", end: "2028-03-17", label: "Fr. 10 März - Fr. 17 März 2028" },
+      { start: "2028-03-17", end: "2028-03-24", label: "Fr. 17 März - Fr. 24 März 2028" },
+      { start: "2028-03-24", end: "2028-03-31", label: "Fr. 24 März - Fr. 31 März 2028" },
+      { start: "2028-03-31", end: "2028-04-07", label: "Fr. 31 März - Fr. 07 Apr. 2028" },
+      { start: "2028-04-14", end: "2028-04-21", label: "Fr. 14 Apr. - Fr. 21 Apr. 2028" }
     ]
   },
   {
@@ -656,42 +728,42 @@
     shipInfo: "Als Premierenschiff des Luxuskonzepts MSC Yacht Club setzt die MSC Fantasia Maßstäbe für entspanntes Reisen. Weitläufige Sonnendecks, ein authentisches Spa-Angebot, ein Formel-1-Simulator und exzellente Spezialitätenrestaurants sorgen für pure Erholung.",
     fullRoute: "Tag 1: Barcelona (Abfahrt 21:00) | Tag 2: Ibiza (12:30–23:30) | Tag 3: Seetag | Tag 4: Cagliari (08:00–17:00) | Tag 5: Civitavecchia (08:00–19:00) | Tag 6: Livorno (08:00–18:00) | Tag 7: Cannes (Tenderbetrieb 07:00–17:00) | Tag 8: Barcelona (Ankunft 09:00)",
     departures: [
-      { start: "2027-04-15", end: "2027-04-22", label: "Do. 15 Apr. - Do. 22 Apr. 2027", price: "€869p.P." },
-      { start: "2027-04-29", end: "2027-05-06", label: "Do. 29 Apr. - Do. 06 Mai 2027", price: "€859p.P." },
-      { start: "2027-05-06", end: "2027-05-13", label: "Do. 06 Mai - Do. 13 Mai 2027", price: "€959p.P." },
-      { start: "2027-05-13", end: "2027-05-20", label: "Do. 13 Mai - Do. 20 Mai 2027", price: "€969p.P." },
-      { start: "2027-05-20", end: "2027-05-27", label: "Do. 20 Mai - Do. 27 Mai 2027", price: "€959p.P." },
-      { start: "2027-05-27", end: "2027-06-03", label: "Do. 27 Mai - Do. 03 Juni 2027", price: "€999p.P." },
-      { start: "2027-06-03", end: "2027-06-10", label: "Do. 03 Juni - Do. 10 Juni 2027", price: "€1.019p.P." },
-      { start: "2027-06-10", end: "2027-06-17", label: "Do. 10 Juni - Do. 17 Juni 2027", price: "€1.039p.P." },
-      { start: "2027-06-17", end: "2027-06-24", label: "Do. 17 Juni - Do. 24 Juni 2027", price: "€1.009p.P." },
-      { start: "2027-06-24", end: "2027-07-01", label: "Do. 24 Juni - Do. 01 Juli 2027", price: "€1.199p.P." },
-      { start: "2027-07-01", end: "2027-07-08", label: "Do. 01 Juli - Do. 08 Juli 2027", price: "€1.169p.P." },
-      { start: "2027-07-08", end: "2027-07-15", label: "Do. 08 Juli - Do. 15 Juli 2027", price: "€1.129p.P." },
-      { start: "2027-07-15", end: "2027-07-22", label: "Do. 15 Juli - Do. 22 Juli 2027", price: "€1.199p.P." },
-      { start: "2027-07-22", end: "2027-07-29", label: "Do. 22 Juli - Do. 29 Juli 2027", price: "€1.079p.P." },
-      { start: "2027-07-29", end: "2027-08-05", label: "Do. 29 Juli - Do. 05 Aug. 2027", price: "€1.109p.P." },
-      { start: "2027-08-05", end: "2027-08-12", label: "Do. 05 Aug. - Do. 12 Aug. 2027", price: "€1.189p.P." },
-      { start: "2027-08-12", end: "2027-08-19", label: "Do. 12 Aug. - Do. 19 Aug. 2027", price: "€1.239p.P." },
-      { start: "2027-08-19", end: "2027-08-26", label: "Do. 19 Aug. - Do. 26 Aug. 2027", price: "€1.229p.P." },
-      { start: "2027-08-26", end: "2027-09-02", label: "Do. 26 Aug. - Do. 02 Sept. 2027", price: "€1.209p.P." },
-      { start: "2027-09-02", end: "2027-09-09", label: "Do. 02 Sept. - Do. 09 Sept. 2027", price: "€1.289p.P." },
-      { start: "2027-09-09", end: "2027-09-16", label: "Do. 09 Sept. - Do. 16 Sept. 2027", price: "€1.099p.P." },
-      { start: "2027-09-16", end: "2027-09-23", label: "Do. 16 Sept. - Do. 23 Sept. 2027", price: "€1.029p.P." },
-      { start: "2027-09-23", end: "2027-09-30", label: "Do. 23 Sept. - Do. 30 Sept. 2027", price: "€1.029p.P." },
-      { start: "2027-09-30", end: "2027-10-07", label: "Do. 30 Sept. - Do. 07 Okt. 2027", price: "€999p.P." },
-      { start: "2027-10-07", end: "2027-10-14", label: "Do. 07 Okt. - Do. 14 Okt. 2027", price: "€929p.P." },
-      { start: "2027-10-14", end: "2027-10-21", label: "Do. 14 Okt. - Do. 21 Okt. 2027", price: "€869p.P." },
-      { start: "2027-10-21", end: "2027-10-28", label: "Do. 21 Okt. - Do. 28 Okt. 2027", price: "€899p.P." },
-      { start: "2027-10-28", end: "2027-11-04", label: "Do. 28 Okt. - Do. 04 Nov. 2027", price: "€899p.P." },
-      { start: "2027-11-04", end: "2027-11-11", label: "Do. 04 Nov. - Do. 11 Nov. 2027", price: "€859p.P." },
-      { start: "2028-04-06", end: "2028-04-13", label: "Do. 06 Apr. - Do. 13 Apr. 2028", price: "€709p.P." },
-      { start: "2028-04-13", end: "2028-04-20", label: "Do. 13 Apr. - Do. 20 Apr. 2028", price: "€889p.P." },
-      { start: "2028-04-20", end: "2028-04-27", label: "Do. 20 Apr. - Do. 27 Apr. 2028", price: "€859p.P." },
-      { start: "2028-04-27", end: "2028-05-04", label: "Do. 27 Apr. - Do. 04 Mai 2028", price: "€859p.P." },
-      { start: "2028-05-04", end: "2028-05-11", label: "Do. 04 Mai - Do. 11 Mai 2028", price: "€859p.P." },
-      { start: "2028-05-11", end: "2028-05-18", label: "Do. 11 Mai - Do. 18 Mai 2028", price: "€889p.P." },
-      { start: "2028-05-18", end: "2028-05-25", label: "Do. 18 Mai - Do. 25 Mai 2028", price: "€889p.P." }
+      { start: "2027-04-15", end: "2027-04-22", label: "Do. 15 Apr. - Do. 22 Apr. 2027" },
+      { start: "2027-04-29", end: "2027-05-06", label: "Do. 29 Apr. - Do. 06 Mai 2027" },
+      { start: "2027-05-06", end: "2027-05-13", label: "Do. 06 Mai - Do. 13 Mai 2027" },
+      { start: "2027-05-13", end: "2027-05-20", label: "Do. 13 Mai - Do. 20 Mai 2027" },
+      { start: "2027-05-20", end: "2027-05-27", label: "Do. 20 Mai - Do. 27 Mai 2027" },
+      { start: "2027-05-27", end: "2027-06-03", label: "Do. 27 Mai - Do. 03 Juni 2027" },
+      { start: "2027-06-03", end: "2027-06-10", label: "Do. 03 Juni - Do. 10 Juni 2027" },
+      { start: "2027-06-10", end: "2027-06-17", label: "Do. 10 Juni - Do. 17 Juni 2027" },
+      { start: "2027-06-17", end: "2027-06-24", label: "Do. 17 Juni - Do. 24 Juni 2027" },
+      { start: "2027-06-24", end: "2027-07-01", label: "Do. 24 Juni - Do. 01 Juli 2027" },
+      { start: "2027-07-01", end: "2027-07-08", label: "Do. 01 Juli - Do. 08 Juli 2027" },
+      { start: "2027-07-08", end: "2027-07-15", label: "Do. 08 Juli - Do. 15 Juli 2027" },
+      { start: "2027-07-15", end: "2027-07-22", label: "Do. 15 Juli - Do. 22 Juli 2027" },
+      { start: "2027-07-22", end: "2027-07-29", label: "Do. 22 Juli - Do. 29 Juli 2027" },
+      { start: "2027-07-29", end: "2027-08-05", label: "Do. 29 Juli - Do. 05 Aug. 2027" },
+      { start: "2027-08-05", end: "2027-08-12", label: "Do. 05 Aug. - Do. 12 Aug. 2027" },
+      { start: "2027-08-12", end: "2027-08-19", label: "Do. 12 Aug. - Do. 19 Aug. 2027" },
+      { start: "2027-08-19", end: "2027-08-26", label: "Do. 19 Aug. - Do. 26 Aug. 2027" },
+      { start: "2027-08-26", end: "2027-09-02", label: "Do. 26 Aug. - Do. 02 Sept. 2027" },
+      { start: "2027-09-02", end: "2027-09-09", label: "Do. 02 Sept. - Do. 09 Sept. 2027" },
+      { start: "2027-09-09", end: "2027-09-16", label: "Do. 09 Sept. - Do. 16 Sept. 2027" },
+      { start: "2027-09-16", end: "2027-09-23", label: "Do. 16 Sept. - Do. 23 Sept. 2027" },
+      { start: "2027-09-23", end: "2027-09-30", label: "Do. 23 Sept. - Do. 30 Sept. 2027" },
+      { start: "2027-09-30", end: "2027-10-07", label: "Do. 30 Sept. - Do. 07 Okt. 2027" },
+      { start: "2027-10-07", end: "2027-10-14", label: "Do. 07 Okt. - Do. 14 Okt. 2027" },
+      { start: "2027-10-14", end: "2027-10-21", label: "Do. 14 Okt. - Do. 21 Okt. 2027" },
+      { start: "2027-10-21", end: "2027-10-28", label: "Do. 21 Okt. - Do. 28 Okt. 2027" },
+      { start: "2027-10-28", end: "2027-11-04", label: "Do. 28 Okt. - Do. 04 Nov. 2027" },
+      { start: "2027-11-04", end: "2027-11-11", label: "Do. 04 Nov. - Do. 11 Nov. 2027" },
+      { start: "2028-04-06", end: "2028-04-13", label: "Do. 06 Apr. - Do. 13 Apr. 2028" },
+      { start: "2028-04-13", end: "2028-04-20", label: "Do. 13 Apr. - Do. 20 Apr. 2028" },
+      { start: "2028-04-20", end: "2028-04-27", label: "Do. 20 Apr. - Do. 27 Apr. 2028" },
+      { start: "2028-04-27", end: "2028-05-04", label: "Do. 27 Apr. - Do. 04 Mai 2028" },
+      { start: "2028-05-04", end: "2028-05-11", label: "Do. 04 Mai - Do. 11 Mai 2028" },
+      { start: "2028-05-11", end: "2028-05-18", label: "Do. 11 Mai - Do. 18 Mai 2028" },
+      { start: "2028-05-18", end: "2028-05-25", label: "Do. 18 Mai - Do. 25 Mai 2028" }
     ]
   },
   {
@@ -1500,22 +1572,22 @@
   shipInfo: "Ein wendiges und überschaubares Schiff, das auch kleinere und exklusive Häfen problemlos ansteuern kann. Familien schätzen den interaktiven Doremi Spray Park, während Erwachsene im Broadway-Theater oder im großzügigen Spa-Bereich entspannen.",
   fullRoute: "Tag 1: La Romana (Abfahrt 23:30) | Tag 2: Catalina Island (Tenderbetrieb 07:00–17:00) | Tag 3: Seetag | Tag 4: Bridgetown (09:00–19:00) | Tag 5: Fort-de-France (08:00–19:00) | Tag 6: Pointe-à-Pitre (07:00–16:00) | Tag 7: Road Town (07:30–15:30) | Tag 8: La Romana (Ankunft 09:00)",
   departures: [
-    { start: "2027-09-27", end: "2027-10-04", label: "Mo. 27 Sept. - Mo. 04 Okt. 2027", price: "€569p.P." },
-    { start: "2027-04-12", end: "2027-04-19", label: "Mo. 12 Apr. - Mo. 19 Apr. 2027", price: "€789p.P." },
-    { start: "2027-04-26", end: "2027-05-03", label: "Mo. 26 Apr. - Mo. 03 Mai 2027", price: "€739p.P." },
-    { start: "2027-05-10", end: "2027-05-17", label: "Mo. 10 Mai - Mo. 17 Mai 2027", price: "€669p.P." },
-    { start: "2027-05-24", end: "2027-05-31", label: "Mo. 24 Mai - Mo. 31 Mai 2027", price: "€669p.P." },
-    { start: "2027-06-07", end: "2027-06-14", label: "Mo. 07 Juni - Mo. 14 Juni 2027", price: "€679p.P." },
-    { start: "2027-06-21", end: "2027-06-28", label: "Mo. 21 Juni - Mo. 28 Juni 2027", price: "€759p.P." },
-    { start: "2027-07-05", end: "2027-07-12", label: "Mo. 05 Juli - Mo. 12 Juli 2027", price: "€769p.P." },
-    { start: "2027-07-19", end: "2027-07-26", label: "Mo. 19 Juli - Mo. 26 Juli 2027", price: "€769p.P." },
-    { start: "2027-08-02", end: "2027-08-09", label: "Mo. 02 Aug. - Mo. 09 Aug. 2027", price: "€789p.P." },
-    { start: "2027-08-16", end: "2027-08-23", label: "Mo. 16 Aug. - Mo. 23 Aug. 2027", price: "€689p.P." },
-    { start: "2027-08-30", end: "2027-09-06", label: "Mo. 30 Aug. - Mo. 06 Sept. 2027", price: "€609p.P." },
-    { start: "2027-09-13", end: "2027-09-20", label: "Mo. 13 Sept. - Mo. 20 Sept. 2027", price: "€579p.P." },
-    { start: "2027-10-11", end: "2027-10-18", label: "Mo. 11 Okt. - Mo. 18 Okt. 2027", price: "€639p.P." },
-    { start: "2027-10-25", end: "2027-11-01", label: "Mo. 25 Okt. - Mo. 01 Nov. 2027", price: "€619p.P." },
-    { start: "2027-11-08", end: "2027-11-15", label: "Mo. 08 Nov. - Mo. 15 Nov. 2027", price: "€639p.P." }
+    { start: "2027-09-27", end: "2027-10-04", label: "Mo. 27 Sept. - Mo. 04 Okt. 2027" },
+    { start: "2027-04-12", end: "2027-04-19", label: "Mo. 12 Apr. - Mo. 19 Apr. 2027" },
+    { start: "2027-04-26", end: "2027-05-03", label: "Mo. 26 Apr. - Mo. 03 Mai 2027" },
+    { start: "2027-05-10", end: "2027-05-17", label: "Mo. 10 Mai - Mo. 17 Mai 2027" },
+    { start: "2027-05-24", end: "2027-05-31", label: "Mo. 24 Mai - Mo. 31 Mai 2027" },
+    { start: "2027-06-07", end: "2027-06-14", label: "Mo. 07 Juni - Mo. 14 Juni 2027" },
+    { start: "2027-06-21", end: "2027-06-28", label: "Mo. 21 Juni - Mo. 28 Juni 2027" },
+    { start: "2027-07-05", end: "2027-07-12", label: "Mo. 05 Juli - Mo. 12 Juli 2027" },
+    { start: "2027-07-19", end: "2027-07-26", label: "Mo. 19 Juli - Mo. 26 Juli 2027" },
+    { start: "2027-08-02", end: "2027-08-09", label: "Mo. 02 Aug. - Mo. 09 Aug. 2027" },
+    { start: "2027-08-16", end: "2027-08-23", label: "Mo. 16 Aug. - Mo. 23 Aug. 2027" },
+    { start: "2027-08-30", end: "2027-09-06", label: "Mo. 30 Aug. - Mo. 06 Sept. 2027" },
+    { start: "2027-09-13", end: "2027-09-20", label: "Mo. 13 Sept. - Mo. 20 Sept. 2027" },
+    { start: "2027-10-11", end: "2027-10-18", label: "Mo. 11 Okt. - Mo. 18 Okt. 2027" },
+    { start: "2027-10-25", end: "2027-11-01", label: "Mo. 25 Okt. - Mo. 01 Nov. 2027" },
+    { start: "2027-11-08", end: "2027-11-15", label: "Mo. 08 Nov. - Mo. 15 Nov. 2027" }
   ]
 },
 {
@@ -1529,18 +1601,18 @@
   shipInfo: "Ein wendiges und überschaubares Schiff, das auch kleinere und exklusive Häfen problemlos ansteuern kann. Familien schätzen den interaktiven Doremi Spray Park, während Erwachsene im Broadway-Theater oder im großzügigen Spa-Bereich entspannen.",
   fullRoute: "Tag 1: Fort De France (Abfahrt 19:00) | Tag 2: St. Johns (09:00–19:00) | Tag 3: Seetag | Tag 4: La Romana (08:00–23:30) | Tag 5: Catalina Island (Tenderbetrieb 07:00–17:00) | Tag 6: Seetag | Tag 7: Bridgetown (09:00–19:00) | Tag 8: Fort De France (Ankunft 08:00)",
   departures: [
-    { start: "2028-09-22", end: "2028-09-29", label: "Fr. 22 Sept. - Fr. 29 Sept. 2028", price: "€599p.P." },
-    { start: "2028-04-21", end: "2028-04-28", label: "Fr. 21 Apr. - Fr. 28 Apr. 2028", price: "€769p.P." },
-    { start: "2028-05-05", end: "2028-05-12", label: "Fr. 05 Mai - Fr. 12 Mai 2028", price: "€729p.P." },
-    { start: "2028-05-19", end: "2028-05-26", label: "Fr. 19 Mai - Fr. 26 Mai 2028", price: "€779p.P." },
-    { start: "2028-06-02", end: "2028-06-09", label: "Fr. 02 Juni - Fr. 09 Juni 2028", price: "€819p.P." },
-    { start: "2028-06-16", end: "2028-06-23", label: "Fr. 16 Juni - Fr. 23 Juni 2028", price: "€819p.P." },
-    { start: "2028-07-28", end: "2028-08-04", label: "Fr. 28 Juli - Fr. 04 Aug. 2028", price: "€959p.P." },
-    { start: "2028-08-25", end: "2028-09-01", label: "Fr. 25 Aug. - Fr. 01 Sept. 2028", price: "€669p.P." },
-    { start: "2028-09-08", end: "2028-09-15", label: "Fr. 08 Sept. - Fr. 15 Sept. 2028", price: "€619p.P." },
-    { start: "2028-10-06", end: "2028-10-13", label: "Fr. 06 Okt. - Fr. 13 Okt. 2028", price: "€619p.P." },
-    { start: "2028-10-20", end: "2028-10-27", label: "Fr. 20 Okt. - Fr. 27 Okt. 2028", price: "€649p.P." },
-    { start: "2028-11-03", end: "2028-11-10", label: "Fr. 03 Nov. - Fr. 10 Nov. 2028", price: "€669p.P." }
+    { start: "2028-09-22", end: "2028-09-29", label: "Fr. 22 Sept. - Fr. 29 Sept. 2028" },
+    { start: "2028-04-21", end: "2028-04-28", label: "Fr. 21 Apr. - Fr. 28 Apr. 2028" },
+    { start: "2028-05-05", end: "2028-05-12", label: "Fr. 05 Mai - Fr. 12 Mai 2028" },
+    { start: "2028-05-19", end: "2028-05-26", label: "Fr. 19 Mai - Fr. 26 Mai 2028" },
+    { start: "2028-06-02", end: "2028-06-09", label: "Fr. 02 Juni - Fr. 09 Juni 2028" },
+    { start: "2028-06-16", end: "2028-06-23", label: "Fr. 16 Juni - Fr. 23 Juni 2028" },
+    { start: "2028-07-28", end: "2028-08-04", label: "Fr. 28 Juli - Fr. 04 Aug. 2028" },
+    { start: "2028-08-25", end: "2028-09-01", label: "Fr. 25 Aug. - Fr. 01 Sept. 2028" },
+    { start: "2028-09-08", end: "2028-09-15", label: "Fr. 08 Sept. - Fr. 15 Sept. 2028" },
+    { start: "2028-10-06", end: "2028-10-13", label: "Fr. 06 Okt. - Fr. 13 Okt. 2028" },
+    { start: "2028-10-20", end: "2028-10-27", label: "Fr. 20 Okt. - Fr. 27 Okt. 2028" },
+    { start: "2028-11-03", end: "2028-11-10", label: "Fr. 03 Nov. - Fr. 10 Nov. 2028" }
   ]
 },
 {
@@ -1554,21 +1626,21 @@
   shipInfo: "Ein wendiges und überschaubares Schiff, das auch kleinere und exklusive Häfen problemlos ansteuern kann. Familien schätzen den interaktiven Doremi Spray Park, während Erwachsene im Broadway-Theater oder im großzügigen Spa-Bereich entspannen.",
   fullRoute: "Tag 1: Fort De France (Abfahrt 19:00) | Tag 2: Pointe-à-Pitre (07:00–16:00) | Tag 3: Road Town (07:30–15:30) | Tag 4: La Romana (09:00–23:30) | Tag 5: Catalina Island (Tenderbetrieb 08:00–17:00) | Tag 6: Virgin Gorda (Tenderbetrieb 11:00–20:00) | Tag 7: Philipsburg (08:00–18:00) | Tag 8: Fort De France (Ankunft 09:00)",
   departures: [
-    { start: "2027-10-01", end: "2027-10-08", label: "Fr. 01 Okt. - Fr. 08 Okt. 2027", price: "€609p.P.", status: "verfügbar" },
-    { start: "2027-04-16", end: "2027-04-23", label: "Fr. 16 Apr. - Fr. 23 Apr. 2027", price: "€869p.P.", status: "verfügbar" },
-    { start: "2027-04-30", end: "2027-05-07", label: "Fr. 30 Apr. - Fr. 07 Mai 2027", price: null, status: "ausverkauft" },
-    { start: "2027-05-14", end: "2027-05-21", label: "Fr. 14 Mai - Fr. 21 Mai 2027", price: "€799p.P.", status: "verfügbar" },
-    { start: "2027-05-28", end: "2027-06-04", label: "Fr. 28 Mai - Fr. 04 Juni 2027", price: null, status: "ausverkauft" },
-    { start: "2027-06-11", end: "2027-06-18", label: "Fr. 11 Juni - Fr. 18 Juni 2027", price: "€829p.P.", status: "verfügbar" },
-    { start: "2027-06-25", end: "2027-07-02", label: "Fr. 25 Juni - Fr. 02 Juli 2027", price: "€849p.P.", status: "verfügbar" },
-    { start: "2027-07-09", end: "2027-07-16", label: "Fr. 09 Juli - Fr. 16 Juli 2027", price: "€969p.P.", status: "verfügbar" },
-    { start: "2027-07-23", end: "2027-07-30", label: "Fr. 23 Juli - Fr. 30 Juli 2027", price: null, status: "ausverkauft" },
-    { start: "2027-08-06", end: "2027-08-13", label: "Fr. 06 Aug. - Fr. 13 Aug. 2027", price: null, status: "ausverkauft" },
-    { start: "2027-08-20", end: "2027-08-27", label: "Fr. 20 Aug. - Fr. 27 Aug. 2027", price: null, status: "ausverkauft" },
-    { start: "2027-09-03", end: "2027-09-10", label: "Fr. 03 Sept. - Fr. 10 Sept. 2027", price: "€629p.P.", status: "verfügbar" },
-    { start: "2027-09-17", end: "2027-09-24", label: "Fr. 17 Sept. - Fr. 24 Sept. 2027", price: "€619p.P.", status: "verfügbar" },
-    { start: "2027-10-15", end: "2027-10-22", label: "Fr. 15 Okt. - Fr. 22 Okt. 2027", price: "€669p.P.", status: "verfügbar" },
-    { start: "2027-10-29", end: "2027-11-05", label: "Fr. 29 Okt. - Fr. 05 Nov. 2027", price: null, status: "verfügbar" }
+    { start: "2027-10-01", end: "2027-10-08", label: "Fr. 01 Okt. - Fr. 08 Okt. 2027" },
+    { start: "2027-04-16", end: "2027-04-23", label: "Fr. 16 Apr. - Fr. 23 Apr. 2027" },
+    { start: "2027-04-30", end: "2027-05-07", label: "Fr. 30 Apr. - Fr. 07 Mai 2027" },
+    { start: "2027-05-14", end: "2027-05-21", label: "Fr. 14 Mai - Fr. 21 Mai 2027" },
+    { start: "2027-05-28", end: "2027-06-04", label: "Fr. 28 Mai - Fr. 04 Juni 2027" },
+    { start: "2027-06-11", end: "2027-06-18", label: "Fr. 11 Juni - Fr. 18 Juni 2027" },
+    { start: "2027-06-25", end: "2027-07-02", label: "Fr. 25 Juni - Fr. 02 Juli 2027" },
+    { start: "2027-07-09", end: "2027-07-16", label: "Fr. 09 Juli - Fr. 16 Juli 2027" },
+    { start: "2027-07-23", end: "2027-07-30", label: "Fr. 23 Juli - Fr. 30 Juli 2027" },
+    { start: "2027-08-06", end: "2027-08-13", label: "Fr. 06 Aug. - Fr. 13 Aug. 2027" },
+    { start: "2027-08-20", end: "2027-08-27", label: "Fr. 20 Aug. - Fr. 27 Aug. 2027" },
+    { start: "2027-09-03", end: "2027-09-10", label: "Fr. 03 Sept. - Fr. 10 Sept. 2027" },
+    { start: "2027-09-17", end: "2027-09-24", label: "Fr. 17 Sept. - Fr. 24 Sept. 2027" },
+    { start: "2027-10-15", end: "2027-10-22", label: "Fr. 15 Okt. - Fr. 22 Okt. 2027" },
+    { start: "2027-10-29", end: "2027-11-05", label: "Fr. 29 Okt. - Fr. 05 Nov. 2027" }
   ]
 },
 {
@@ -1582,21 +1654,21 @@
   shipInfo: "Ein wendiges und überschaubares Schiff, das auch kleinere und exklusive Häfen problemlos ansteuern kann. Familien schätzen den interaktiven Doremi Spray Park, während Erwachsene im Broadway-Theater oder im großzügigen Spa-Bereich entspannen.",
   fullRoute: "Tag 1: Bridgetown (Abfahrt 19:00) | Tag 2: Fort-de-France (08:00–19:00) | Tag 3: Pointe-à-Pitre (07:00–16:00) | Tag 4: Road Town (07:30–15:30) | Tag 5: La Romana (09:00–23:30) | Tag 6: Catalina Island (Tenderbetrieb 08:00–17:00) | Tag 7: Virgin Gorda (Tenderbetrieb 11:00–20:00) | Tag 8: Philipsburg (08:00–18:00) | Tag 9: Fort-de-France (09:00–19:00) | Tag 10: St. Johns (09:00–19:00) | Tag 11: Seetag | Tag 12: La Romana (08:00–23:30) | Tag 13: Catalina Island (Tenderbetrieb 07:00–17:00) | Tag 14: Seetag | Tag 15: Bridgetown (Ankunft 09:00)",
   departures: [
-    { start: "2028-09-28", end: "2028-10-12", label: "Do. 28 Sept. - Do. 12 Okt. 2028", price: "€1.218p.P." },
-    { start: "2028-04-13", end: "2028-04-27", label: "Do. 13 Apr. - Do. 27 Apr. 2028", price: "€1.758p.P." },
-    { start: "2028-04-27", end: "2028-05-11", label: "Do. 27 Apr. - Do. 11 Mai 2028", price: "€1.648p.P." },
-    { start: "2028-05-11", end: "2028-05-25", label: "Do. 11 Mai - Do. 25 Mai 2028", price: "€1.488p.P." },
-    { start: "2028-05-25", end: "2028-06-08", label: "Do. 25 Mai - Do. 08 Juni 2028", price: "€1.578p.P." },
-    { start: "2028-06-08", end: "2028-06-22", label: "Do. 08 Juni - Do. 22 Juni 2028", price: "€1.658p.P." },
-    { start: "2028-06-22", end: "2028-07-06", label: "Do. 22 Juni - Do. 06 Juli 2028", price: "€1.678p.P." },
-    { start: "2028-07-06", end: "2028-07-20", label: "Do. 06 Juli - Do. 20 Juli 2028", price: "€1.758p.P." },
-    { start: "2028-07-20", end: "2028-08-03", label: "Do. 20 Juli - Do. 03 Aug. 2028", price: "€1.808p.P." },
-    { start: "2028-08-03", end: "2028-08-17", label: "Do. 03 Aug. - Do. 17 Aug. 2028", price: "€1.938p.P." },
-    { start: "2028-08-17", end: "2028-08-31", label: "Do. 17 Aug. - Do. 31 Aug. 2028", price: "€1.688p.P." },
-    { start: "2028-08-31", end: "2028-09-14", label: "Do. 31 Aug. - Do. 14 Sept. 2028", price: "€1.298p.P." },
-    { start: "2028-09-14", end: "2028-09-28", label: "Do. 14 Sept. - Do. 28 Sept. 2028", price: "€1.238p.P." },
-    { start: "2028-10-12", end: "2028-10-26", label: "Do. 12 Okt. - Do. 26 Okt. 2028", price: null },
-    { start: "2028-10-26", end: "2028-11-09", label: "Do. 26 Okt. - Do. 09 Nov. 2028", price: null }
+    { start: "2028-09-28", end: "2028-10-12", label: "Do. 28 Sept. - Do. 12 Okt. 2028" },
+    { start: "2028-04-13", end: "2028-04-27", label: "Do. 13 Apr. - Do. 27 Apr. 2028" },
+    { start: "2028-04-27", end: "2028-05-11", label: "Do. 27 Apr. - Do. 11 Mai 2028" },
+    { start: "2028-05-11", end: "2028-05-25", label: "Do. 11 Mai - Do. 25 Mai 2028" },
+    { start: "2028-05-25", end: "2028-06-08", label: "Do. 25 Mai - Do. 08 Juni 2028" },
+    { start: "2028-06-08", end: "2028-06-22", label: "Do. 08 Juni - Do. 22 Juni 2028" },
+    { start: "2028-06-22", end: "2028-07-06", label: "Do. 22 Juni - Do. 06 Juli 2028" },
+    { start: "2028-07-06", end: "2028-07-20", label: "Do. 06 Juli - Do. 20 Juli 2028" },
+    { start: "2028-07-20", end: "2028-08-03", label: "Do. 20 Juli - Do. 03 Aug. 2028" },
+    { start: "2028-08-03", end: "2028-08-17", label: "Do. 03 Aug. - Do. 17 Aug. 2028" },
+    { start: "2028-08-17", end: "2028-08-31", label: "Do. 17 Aug. - Do. 31 Aug. 2028" },
+    { start: "2028-08-31", end: "2028-09-14", label: "Do. 31 Aug. - Do. 14 Sept. 2028" },
+    { start: "2028-09-14", end: "2028-09-28", label: "Do. 14 Sept. - Do. 28 Sept. 2028" },
+    { start: "2028-10-12", end: "2028-10-26", label: "Do. 12 Okt. - Do. 26 Okt. 2028" },
+    { start: "2028-10-26", end: "2028-11-09", label: "Do. 26 Okt. - Do. 09 Nov. 2028" }
   ]
 },
 {
@@ -1610,21 +1682,21 @@
   shipInfo: "Ein wendiges und überschaubares Schiff, welches auch kleinere und exklusive Häfen problemlos ansteuern kann. Familien schätzen den interaktiven Doremi Spray Park, während Erwachsene im Broadway-Theater oder im großzügigen Spa-Bereich entspannen.",
   fullRoute: "Tag 1: La Romana (Abfahrt 23:30) | Tag 2: Catalina Island (Tenderbetrieb 07:00–17:00) | Tag 3: Seetag | Tag 4: Bridgetown (09:00–19:00) | Tag 5: Fort-de-France (08:00–19:00) | Tag 6: Pointe-à-Pitre (07:00–16:00) | Tag 7: Road Town (07:30–15:30) | Tag 8: La Romana (09:00–23:30) | Tag 9: Catalina Island (08:00–17:00) | Tag 10: Virgin Gorda (11:00–20:00) | Tag 11: Philipsburg (08:00–18:00) | Tag 12: Fort-de-France (09:00–19:00) | Tag 13: St. Johns (09:00–19:00) | Tag 14: Seetag | Tag 15: La Romana (Ankunft 08:00)",
   departures: [
-    { start: "2028-09-11", end: "2028-09-25", label: "Mo. 11 Sept. - Mo. 25 Sept. 2028", price: "€1.248p.P.", status: "verfügbar" },
-    { start: "2028-04-10", end: "2028-04-24", label: "Mo. 10 Apr. - Mo. 24 Apr. 2028", price: "€1.758p.P.", status: "verfügbar" },
-    { start: "2028-04-24", end: "2028-05-08", label: "Mo. 24 Apr. - Mo. 08 Mai 2028", price: null, status: "ausverkauft" },
-    { start: "2028-05-08", end: "2028-05-22", label: "Mo. 08 Mai - Mo. 22 Mai 2028", price: "€1.558p.P.", status: "verfügbar" },
-    { start: "2028-05-22", end: "2028-06-05", label: "Mo. 22 Mai - Mo. 05 Juni 2028", price: "€1.438p.P.", status: "verfügbar" },
-    { start: "2028-06-05", end: "2028-06-19", label: "Mo. 05 Juni - Mo. 19 Juni 2028", price: "€1.518p.P.", status: "verfügbar" },
-    { start: "2028-06-19", end: "2028-07-03", label: "Mo. 19 Juni - Mo. 03 Juli 2028", price: "€1.548p.P.", status: "verfügbar" },
-    { start: "2028-07-03", end: "2028-07-17", label: "Mo. 03 Juli - Mo. 17 Juli 2028", price: "€1.778p.P.", status: "verfügbar" },
-    { start: "2028-07-17", end: "2028-07-31", label: "Mo. 17 Juli - Mo. 31 Juli 2028", price: null, status: "ausverkauft" },
-    { start: "2028-07-31", end: "2028-08-14", label: "Mo. 31 Juli - Mo. 14 Aug. 2028", price: "€1.638p.P.", status: "verfügbar" },
-    { start: "2028-08-14", end: "2028-08-28", label: "Mo. 14 Aug. - Mo. 28 Aug. 2028", price: "€1.678p.P.", status: "verfügbar" },
-    { start: "2028-08-28", end: "2028-09-11", label: "Mo. 28 Aug. - Mo. 11 Sept. 2028", price: null, status: "ausverkauft" },
-    { start: "2028-09-25", end: "2028-10-09", label: "Mo. 25 Sept. - Mo. 09 Okt. 2028", price: "€1.268p.P.", status: "verfügbar" },
-    { start: "2028-10-09", end: "2028-10-23", label: "Mo. 09 Okt. - Mo. 23 Okt. 2028", price: "€1.338p.P.", status: "verfügbar" },
-    { start: "2028-10-23", end: "2028-11-06", label: "Mo. 23 Okt. - Mo. 06 Nov. 2028", price: "€1.338p.P.", status: "verfügbar" }
+    { start: "2028-09-11", end: "2028-09-25", label: "Mo. 11 Sept. - Mo. 25 Sept. 2028" },
+    { start: "2028-04-10", end: "2028-04-24", label: "Mo. 10 Apr. - Mo. 24 Apr. 2028" },
+    { start: "2028-04-24", end: "2028-05-08", label: "Mo. 24 Apr. - Mo. 08 Mai 2028" },
+    { start: "2028-05-08", end: "2028-05-22", label: "Mo. 08 Mai - Mo. 22 Mai 2028" },
+    { start: "2028-05-22", end: "2028-06-05", label: "Mo. 22 Mai - Mo. 05 Juni 2028" },
+    { start: "2028-06-05", end: "2028-06-19", label: "Mo. 05 Juni - Mo. 19 Juni 2028" },
+    { start: "2028-06-19", end: "2028-07-03", label: "Mo. 19 Juni - Mo. 03 Juli 2028" },
+    { start: "2028-07-03", end: "2028-07-17", label: "Mo. 03 Juli - Mo. 17 Juli 2028" },
+    { start: "2028-07-17", end: "2028-07-31", label: "Mo. 17 Juli - Mo. 31 Juli 2028" },
+    { start: "2028-07-31", end: "2028-08-14", label: "Mo. 31 Juli - Mo. 14 Aug. 2028" },
+    { start: "2028-08-14", end: "2028-08-28", label: "Mo. 14 Aug. - Mo. 28 Aug. 2028" },
+    { start: "2028-08-28", end: "2028-09-11", label: "Mo. 28 Aug. - Mo. 11 Sept. 2028" },
+    { start: "2028-09-25", end: "2028-10-09", label: "Mo. 25 Sept. - Mo. 09 Okt. 2028" },
+    { start: "2028-10-09", end: "2028-10-23", label: "Mo. 09 Okt. - Mo. 23 Okt. 2028" },
+    { start: "2028-10-23", end: "2028-11-06", label: "Mo. 23 Okt. - Mo. 06 Nov. 2028" }
   ]
 },
 {
@@ -1638,23 +1710,23 @@
   shipInfo: "Ein wendiges und überschaubares Schiff, das auch kleinere und exklusive Häfen problemlos ansteuern kann. Familien schätzen den interaktiven Doremi Spray Park, während Erwachsene im Broadway-Theater oder im großzügigen Spa-Bereich entspannen.",
   fullRoute: "Tag 1: La Romana (Abfahrt 23:30) | Tag 2: Catalina Island (Tenderbetrieb 08:00–17:00) | Tag 3: Virgin Gorda (Tenderbetrieb 11:00–20:00) | Tag 4: Philipsburg (08:00–18:00) | Tag 5: Fort-de-France (09:00–19:00) | Tag 6: St. Johns (09:00–19:00) | Tag 7: Seetag | Tag 8: La Romana (08:00–23:30) | Tag 9: Catalina Island (Tenderbetrieb 07:00–17:00) | Tag 10: Seetag | Tag 11: Bridgetown (09:00–19:00) | Tag 12: Fort-de-France (08:00–19:00) | Tag 13: Pointe-à-Pitre (07:00–16:00) | Tag 14: Road Town (07:30–15:30) | Tag 15: La Romana (Ankunft 09:00)",
   departures: [
-    { start: "2028-09-18", end: "2028-10-02", label: "Mo. 18 Sept. - Mo. 02 Okt. 2028", price: "€1.248p.P." },
-    { start: "2028-04-17", end: "2028-05-01", label: "Mo. 17 Apr. - Mo. 01 Mai 2028", price: "€1.698p.P." },
-    { start: "2028-05-01", end: "2028-05-15", label: "Mo. 01 Mai - Mo. 15 Mai 2028", price: "€1.698p.P." },
-    { start: "2028-05-15", end: "2028-05-29", label: "Mo. 15 Mai - Mo. 29 Mai 2028", price: "€1.438p.P." },
-    { start: "2028-05-29", end: "2028-06-12", label: "Mo. 29 Mai - Mo. 12 Juni 2028", price: "€1.758p.P." },
-    { start: "2028-06-12", end: "2028-06-26", label: "Mo. 12 Juni - Mo. 26 Juni 2028", price: "€1.518p.P." },
-    { start: "2028-06-26", end: "2028-07-10", label: "Mo. 26 Juni - Mo. 10 Juli 2028", price: "€1.728p.P." },
-    { start: "2028-07-10", end: "2028-07-24", label: "Mo. 10 Juli - Mo. 24 Juli 2028", price: "€1.648p.P." },
-    { start: "2028-07-24", end: "2028-08-07", label: "Mo. 24 Juli - Mo. 07 Aug. 2028", price: "€1.868p.P." },
-    { start: "2028-08-07", end: "2028-08-21", label: "Mo. 07 Aug. - Mo. 21 Aug. 2028", price: "€1.748p.P." },
-    { start: "2028-08-21", end: "2028-09-04", label: "Mo. 21 Aug. - Mo. 04 Sept. 2028", price: "€1.418p.P." },
-    { start: "2028-09-04", end: "2028-09-18", label: "Mo. 04 Sept. - Mo. 18 Sept. 2028", price: "€1.288p.P." },
-    { start: "2028-09-11", end: "2028-09-25", label: "Mo. 11 Sept. - Mo. 25 Sept. 2028", price: null, status: "ausverkauft" },
-    { start: "2028-09-25", end: "2028-10-09", label: "Mo. 25 Sept. - Mo. 09 Okt. 2028", price: "€1.268p.P." },
-    { start: "2028-10-02", end: "2028-10-16", label: "Mo. 02 Okt. - Mo. 16 Okt. 2028", price: "€1.338p.P." },
-    { start: "2028-10-16", end: "2028-10-30", label: "Mo. 16 Okt. - Mo. 30 Okt. 2028", price: "€1.338p.P." },
-    { start: "2028-10-30", end: "2028-11-13", label: "Mo. 30 Okt. - Mo. 13 Nov. 2028", price: "€1.338p.P." }
+    { start: "2028-09-18", end: "2028-10-02", label: "Mo. 18 Sept. - Mo. 02 Okt. 2028" },
+    { start: "2028-04-17", end: "2028-05-01", label: "Mo. 17 Apr. - Mo. 01 Mai 2028" },
+    { start: "2028-05-01", end: "2028-05-15", label: "Mo. 01 Mai - Mo. 15 Mai 2028" },
+    { start: "2028-05-15", end: "2028-05-29", label: "Mo. 15 Mai - Mo. 29 Mai 2028" },
+    { start: "2028-05-29", end: "2028-06-12", label: "Mo. 29 Mai - Mo. 12 Juni 2028" },
+    { start: "2028-06-12", end: "2028-06-26", label: "Mo. 12 Juni - Mo. 26 Juni 2028" },
+    { start: "2028-06-26", end: "2028-07-10", label: "Mo. 26 Juni - Mo. 10 Juli 2028" },
+    { start: "2028-07-10", end: "2028-07-24", label: "Mo. 10 Juli - Mo. 24 Juli 2028" },
+    { start: "2028-07-24", end: "2028-08-07", label: "Mo. 24 Juli - Mo. 07 Aug. 2028" },
+    { start: "2028-08-07", end: "2028-08-21", label: "Mo. 07 Aug. - Mo. 21 Aug. 2028" },
+    { start: "2028-08-21", end: "2028-09-04", label: "Mo. 21 Aug. - Mo. 04 Sept. 2028" },
+    { start: "2028-09-04", end: "2028-09-18", label: "Mo. 04 Sept. - Mo. 18 Sept. 2028" },
+    { start: "2028-09-11", end: "2028-09-25", label: "Mo. 11 Sept. - Mo. 25 Sept. 2028" },
+    { start: "2028-09-25", end: "2028-10-09", label: "Mo. 25 Sept. - Mo. 09 Okt. 2028" },
+    { start: "2028-10-02", end: "2028-10-16", label: "Mo. 02 Okt. - Mo. 16 Okt. 2028" },
+    { start: "2028-10-16", end: "2028-10-30", label: "Mo. 16 Okt. - Mo. 30 Okt. 2028" },
+    { start: "2028-10-30", end: "2028-11-13", label: "Mo. 30 Okt. - Mo. 13 Nov. 2028" }
   ]
 },
 {
@@ -1668,16 +1740,16 @@
   shipInfo: "Ein wendiges und überschaubares Schiff, das auch kleinere und exklusive Häfen problemlos ansteuern kann. Familien schätzen den interaktiven Doremi Spray Park, während Erwachsene im Broadway-Theater oder im großzügigen Spa-Bereich entspannen.",
   fullRoute: "Tag 1: La Romana (Abfahrt 23:30) | Tag 2: Catalina Island (Tenderbetrieb 08:00–17:00) | Tag 3: Oranjestad (14:00–21:00) | Tag 4: Willemstad (08:00–20:00) | Tag 5: Kralendijk (07:00–15:00) | Tag 6: Saint George (14:00–21:00) | Tag 7: Seetag | Tag 8: La Romana (08:00–23:30) | Tag 9: Catalina Island (08:00–17:00) | Tag 10: Virgin Gorda (11:00–20:00) | Tag 11: Philipsburg (08:00–18:00) | Tag 12: Basseterre (09:00–19:00) | Tag 13: St. Johns (09:00–19:00) | Tag 14: Seetag | Tag 15: La Romana (Ankunft 08:00)",
   departures: [
-    { start: "2027-11-22", end: "2027-12-06", label: "Mo. 22 Nov. - Mo. 06 Dez. 2027", price: "€1.298p.P." },
-    { start: "2027-12-06", end: "2027-12-20", label: "Mo. 06 Dez. - Mo. 20 Dez. 2027", price: "€1.558p.P." },
-    { start: "2027-12-20", end: "2028-01-03", label: "Mo. 20 Dez. - Mo. 03 Jan. 2028", price: "€2.598p.P." },
-    { start: "2028-01-03", end: "2028-01-17", label: "Mo. 03 Jan. - Mo. 17 Jan. 2028", price: "€1.638p.P." },
-    { start: "2028-01-17", end: "2028-01-31", label: "Mo. 17 Jan. - Mo. 31 Jan. 2028", price: "€1.518p.P." },
-    { start: "2028-01-31", end: "2028-02-14", label: "Mo. 31 Jan. - Mo. 14 Feb. 2028", price: "€1.818p.P." },
-    { start: "2028-02-14", end: "2028-02-28", label: "Mo. 14 Feb. - Mo. 28 Feb. 2028", price: "€1.588p.P." },
-    { start: "2028-02-28", end: "2028-03-13", label: "Mo. 28 Feb. - Mo. 13 März 2028", price: "€1.738p.P." },
-    { start: "2028-03-13", end: "2028-03-27", label: "Mo. 13 März - Mo. 27 März 2028", price: "€1.478p.P." },
-    { start: "2028-03-27", end: "2028-04-10", label: "Mo. 27 März - Mo. 10 Apr. 2028", price: "€1.538p.P." }
+    { start: "2027-11-22", end: "2027-12-06", label: "Mo. 22 Nov. - Mo. 06 Dez. 2027" },
+    { start: "2027-12-06", end: "2027-12-20", label: "Mo. 06 Dez. - Mo. 20 Dez. 2027" },
+    { start: "2027-12-20", end: "2028-01-03", label: "Mo. 20 Dez. - Mo. 03 Jan. 2028" },
+    { start: "2028-01-03", end: "2028-01-17", label: "Mo. 03 Jan. - Mo. 17 Jan. 2028" },
+    { start: "2028-01-17", end: "2028-01-31", label: "Mo. 17 Jan. - Mo. 31 Jan. 2028" },
+    { start: "2028-01-31", end: "2028-02-14", label: "Mo. 31 Jan. - Mo. 14 Feb. 2028" },
+    { start: "2028-02-14", end: "2028-02-28", label: "Mo. 14 Feb. - Mo. 28 Feb. 2028" },
+    { start: "2028-02-28", end: "2028-03-13", label: "Mo. 28 Feb. - Mo. 13 März 2028" },
+    { start: "2028-03-13", end: "2028-03-27", label: "Mo. 13 März - Mo. 27 März 2028" },
+    { start: "2028-03-27", end: "2028-04-10", label: "Mo. 27 März - Mo. 10 Apr. 2028" }
   ]
 },
 {
@@ -1691,16 +1763,16 @@
   shipInfo: "Ein wendiges und überschaubares Schiff, das auch kleinere und exklusive Häfen problemlos ansteuern kann. Familien schätzen den interaktiven Doremi Spray Park, während Erwachsene im Broadway-Theater oder im großzügigen Spa-Bereich entspannen.",
   fullRoute: "Tag 1: La Romana (Abfahrt 23:30) | Tag 2: Catalina Island (Tenderbetrieb 08:00–17:00) | Tag 3: Oranjestad (14:00–21:00) | Tag 4: Willemstad (08:00–20:00) | Tag 5: Kralendijk (07:00–15:00) | Tag 6: Saint George (14:00–21:00) | Tag 7: Seetag | Tag 8: La Romana (08:00–23:30) | Tag 9: Catalina Island (08:00–17:00) | Tag 10: Virgin Gorda (11:00–20:00) | Tag 11: Philipsburg (08:00–18:00) | Tag 12: Basseterre (09:00–19:00) | Tag 13: St. Johns (09:00–19:00) | Tag 14: Seetag | Tag 15: La Romana (Ankunft 08:00)",
   departures: [
-    { start: "2027-11-22", end: "2027-12-06", label: "Mo. 22 Nov. - Mo. 06 Dez. 2027", price: "€1.298p.P." },
-    { start: "2027-12-06", end: "2027-12-20", label: "Mo. 06 Dez. - Mo. 20 Dez. 2027", price: "€1.558p.P." },
-    { start: "2027-12-20", end: "2028-01-03", label: "Mo. 20 Dez. - Mo. 03 Jan. 2028", price: "€2.598p.P." },
-    { start: "2028-01-03", end: "2028-01-17", label: "Mo. 03 Jan. - Mo. 17 Jan. 2028", price: "€1.638p.P." },
-    { start: "2028-01-17", end: "2028-01-31", label: "Mo. 17 Jan. - Mo. 31 Jan. 2028", price: "€1.518p.P." },
-    { start: "2028-01-31", end: "2028-02-14", label: "Mo. 31 Jan. - Mo. 14 Feb. 2028", price: "€1.818p.P." },
-    { start: "2028-02-14", end: "2028-02-28", label: "Mo. 14 Feb. - Mo. 28 Feb. 2028", price: "€1.588p.P." },
-    { start: "2028-02-28", end: "2028-03-13", label: "Mo. 28 Feb. - Mo. 13 März 2028", price: "€1.738p.P." },
-    { start: "2028-03-13", end: "2028-03-27", label: "Mo. 13 März - Mo. 27 März 2028", price: "€1.478p.P." },
-    { start: "2028-03-27", end: "2028-04-10", label: "Mo. 27 März - Mo. 10 Apr. 2028", price: "€1.538p.P." }
+    { start: "2027-11-22", end: "2027-12-06", label: "Mo. 22 Nov. - Mo. 06 Dez. 2027" },
+    { start: "2027-12-06", end: "2027-12-20", label: "Mo. 06 Dez. - Mo. 20 Dez. 2027" },
+    { start: "2027-12-20", end: "2028-01-03", label: "Mo. 20 Dez. - Mo. 03 Jan. 2028" },
+    { start: "2028-01-03", end: "2028-01-17", label: "Mo. 03 Jan. - Mo. 17 Jan. 2028" },
+    { start: "2028-01-17", end: "2028-01-31", label: "Mo. 17 Jan. - Mo. 31 Jan. 2028" },
+    { start: "2028-01-31", end: "2028-02-14", label: "Mo. 31 Jan. - Mo. 14 Feb. 2028" },
+    { start: "2028-02-14", end: "2028-02-28", label: "Mo. 14 Feb. - Mo. 28 Feb. 2028" },
+    { start: "2028-02-28", end: "2028-03-13", label: "Mo. 28 Feb. - Mo. 13 März 2028" },
+    { start: "2028-03-13", end: "2028-03-27", label: "Mo. 13 März - Mo. 27 März 2028" },
+    { start: "2028-03-27", end: "2028-04-10", label: "Mo. 27 März - Mo. 10 Apr. 2028" }
   ]
 },
 {
@@ -1714,19 +1786,19 @@
   shipInfo: "Das elegante Schiff besticht durch seine lebendige Promenade im Herzen des Schiffes mit atemberaubender LED-Kuppel. Neben hochkarätiger Unterhaltung, großzügigen Sportbereichen und vielfältiger Gastronomie genießen Gäste im exklusiven MSC Yacht Club ein luxuriöses Schiff-im-Schiff-Erlebnis.",
   fullRoute: "Tag 1: Port Canaveral (Abfahrt 16:00) | Tag 2: Nassau (09:00–18:00) | Tag 3: Ocean Cay MSC Marine Reserve (08:00–18:00) | Tag 4: Seetag | Tag 5: Cozumel (07:00–19:00) | Tag 6: Costa Maya (08:00–14:00) | Tag 7: Seetag | Tag 8: Port Canaveral (07:00–16:00) | Tag 9: Nassau (09:00–18:00) | Tag 10: Ocean Cay MSC Marine Reserve (08:00–18:00) | Tag 11: Seetag | Tag 12: Puerto Plata (08:00–17:00) | Tag 13: Seetag | Tag 14: Seetag | Tag 15: Port Canaveral (Ankunft 07:00)",
   departures: [
-    { start: "2027-09-04", end: "2027-09-18", label: "Sa. 04 Sept. - Sa. 18 Sept. 2027", price: "€1.112p.P." },
-    { start: "2027-05-01", end: "2027-05-15", label: "Sa. 01 Mai - Sa. 15 Mai 2027", price: "€1.121p.P." },
-    { start: "2027-05-15", end: "2027-05-29", label: "Sa. 15 Mai - Sa. 29 Mai 2027", price: "€1.157p.P." },
-    { start: "2027-05-29", end: "2027-06-12", label: "Sa. 29 Mai - Sa. 12 Juni 2027", price: "€1.374p.P." },
-    { start: "2027-06-12", end: "2027-06-26", label: "Sa. 12 Juni - Sa. 26 Juni 2027", price: "€1.518p.P." },
-    { start: "2027-06-26", end: "2027-07-10", label: "Sa. 26 Juni - Sa. 10 Juli 2027", price: "€1.584p.P." },
-    { start: "2027-07-10", end: "2027-07-24", label: "Sa. 10 Juli - Sa. 24 Juli 2027", price: "€1.584p.P." },
-    { start: "2027-07-24", end: "2027-08-07", label: "Sa. 24 Juli - Sa. 07 Aug. 2027", price: "€1.724p.P." },
-    { start: "2027-08-07", end: "2027-08-21", label: "Sa. 07 Aug. - Sa. 21 Aug. 2027", price: "€1.419p.P." },
-    { start: "2027-08-21", end: "2027-09-04", label: "Sa. 21 Aug. - Sa. 04 Sept. 2027", price: "€1.285p.P." },
-    { start: "2027-09-18", end: "2027-10-02", label: "Sa. 18 Sept. - Sa. 02 Okt. 2027", price: "€1.160p.P." },
-    { start: "2027-10-02", end: "2027-10-16", label: "Sa. 02 Okt. - Sa. 16 Okt. 2027", price: "€1.280p.P." },
-    { start: "2027-10-16", end: "2027-10-30", label: "Sa. 16 Okt. - Sa. 30 Okt. 2027", price: "€1.180p.P." }
+    { start: "2027-09-04", end: "2027-09-18", label: "Sa. 04 Sept. - Sa. 18 Sept. 2027" },
+    { start: "2027-05-01", end: "2027-05-15", label: "Sa. 01 Mai - Sa. 15 Mai 2027" },
+    { start: "2027-05-15", end: "2027-05-29", label: "Sa. 15 Mai - Sa. 29 Mai 2027" },
+    { start: "2027-05-29", end: "2027-06-12", label: "Sa. 29 Mai - Sa. 12 Juni 2027" },
+    { start: "2027-06-12", end: "2027-06-26", label: "Sa. 12 Juni - Sa. 26 Juni 2027" },
+    { start: "2027-06-26", end: "2027-07-10", label: "Sa. 26 Juni - Sa. 10 Juli 2027" },
+    { start: "2027-07-10", end: "2027-07-24", label: "Sa. 10 Juli - Sa. 24 Juli 2027" },
+    { start: "2027-07-24", end: "2027-08-07", label: "Sa. 24 Juli - Sa. 07 Aug. 2027" },
+    { start: "2027-08-07", end: "2027-08-21", label: "Sa. 07 Aug. - Sa. 21 Aug. 2027" },
+    { start: "2027-08-21", end: "2027-09-04", label: "Sa. 21 Aug. - Sa. 04 Sept. 2027" },
+    { start: "2027-09-18", end: "2027-10-02", label: "Sa. 18 Sept. - Sa. 02 Okt. 2027" },
+    { start: "2027-10-02", end: "2027-10-16", label: "Sa. 02 Okt. - Sa. 16 Okt. 2027" },
+    { start: "2027-10-16", end: "2027-10-30", label: "Sa. 16 Okt. - Sa. 30 Okt. 2027" }
   ]
 },
 {
@@ -2061,15 +2133,15 @@
   shipInfo: "Ein perfektes Allwetter-Schiff mit doppelstöckiger Shopping-Promenade und spektakulärem LED-Videohimmel. An Bord begeistern der aufregende Grand Canyon Aquapark, erstklassige Spezialitätenrestaurants sowie die glamouröse Carousel Lounge für unvergessliche Abendshows.",
   fullRoute: "Tag 1: Shanghai (Abfahrt 16:30) | Tag 2: Gangjeong Jeju Island (14:00–22:00) | Tag 3: Busan (10:00–21:00) | Tag 4: Seetag | Tag 5: Shanghai (Ankunft 07:00)",
   departures: [
-    { start: "2027-01-24", end: "2027-01-28", price: 469, label: "So. 24 Jan. 2027 - Do. 28 Jan. 2027" },
-    { start: "2027-02-02", end: "2027-02-06", price: 539, label: "Di. 02 Feb. 2027 - Sa. 06 Feb. 2027" },
-    { start: "2027-02-11", end: "2027-02-15", price: 589, label: "Do. 11 Feb. 2027 - Mo. 15 Feb. 2027" },
-    { start: "2027-02-20", end: "2027-02-24", price: 429, label: "Sa. 20 Feb. 2027 - Mi. 24 Feb. 2027" },
-    { start: "2027-03-01", end: "2027-03-05", price: 439, label: "Mo. 01 März 2027 - Fr. 05 März 2027" },
-    { start: "2027-08-16", end: "2027-08-20", price: null, soldOut: true, label: "Mo. 16 Aug. 2027 - Fr. 20 Aug. 2027" },
-    { start: "2027-08-20", end: "2027-08-24", price: 539, label: "Fr. 20 Aug. 2027 - Di. 24 Aug. 2027" },
-    { start: "2027-09-03", end: "2027-09-07", price: 559, label: "Fr. 03 Sept. 2027 - Di. 07 Sept. 2027" },
-    { start: "2027-09-12", end: "2027-09-16", price: 509, label: "So. 12 Sept. 2027 - Do. 16 Sept. 2027" }
+    { start: "2027-01-24", end: "2027-01-28", label: "So. 24 Jan. 2027 - Do. 28 Jan. 2027" },
+    { start: "2027-02-02", end: "2027-02-06", label: "Di. 02 Feb. 2027 - Sa. 06 Feb. 2027" },
+    { start: "2027-02-11", end: "2027-02-15", label: "Do. 11 Feb. 2027 - Mo. 15 Feb. 2027" },
+    { start: "2027-02-20", end: "2027-02-24", label: "Sa. 20 Feb. 2027 - Mi. 24 Feb. 2027" },
+    { start: "2027-03-01", end: "2027-03-05", label: "Mo. 01 März 2027 - Fr. 05 März 2027" },
+    { start: "2027-08-16", end: "2027-08-20", label: "Mo. 16 Aug. 2027 - Fr. 20 Aug. 2027" },
+    { start: "2027-08-20", end: "2027-08-24", label: "Fr. 20 Aug. 2027 - Di. 24 Aug. 2027" },
+    { start: "2027-09-03", end: "2027-09-07", label: "Fr. 03 Sept. 2027 - Di. 07 Sept. 2027" },
+    { start: "2027-09-12", end: "2027-09-16", label: "So. 12 Sept. 2027 - Do. 16 Sept. 2027" }
   ]
 },
 {
@@ -2190,14 +2262,14 @@
   shipInfo: "Der eindrucksvolle Pionier der Meraviglia Klasse kombiniert modernste Schiffsarchitektur mit außergewöhnlichem Design. Eine 96 Meter lange Promenade voller Boutiquen und Restaurants, der Polaris-Aquapark sowie der großzügig gestaltete MSC Yacht Club lassen keine Wünsche offen.",
   fullRoute: "Tag 1: Camboriu (Abfahrt 17:00) | Tag 2: Seetag (An Bord Aktivitäten) | Tag 3: Punta Del Este (Tenderbootbetrieb 07:00–16:00) | Tag 4: Buenos Aires (08:00–20:00) | Tag 5–6: Seetag (An Bord Aktivitäten) | Tag 7: Santos (08:00–18:00) | Tag 8: Camboriu (Ankunft 08:00)",
   departures: [
-    { start: "2028-01-10", end: "2028-01-17", label: "Mo. 10 Jan. - Mo. 17 Jan. 2028", price: "€1.027 p.P." },
-    { start: "2028-01-17", end: "2028-01-24", label: "Mo. 17 Jan. - Mo. 24 Jan. 2028", price: "€1.027 p.P." },
-    { start: "2028-01-24", end: "2028-01-31", label: "Mo. 24 Jan. - Mo. 31 Jan. 2028", price: "€927 p.P." },
-    { start: "2028-02-07", end: "2028-02-14", label: "Mo. 07 Feb. - Mo. 14 Feb. 2028", price: "€927 p.P." },
-    { start: "2028-02-14", end: "2028-02-21", label: "Mo. 14 Feb. - Mo. 21 Feb. 2028", price: "€917 p.P." },
-    { start: "2028-02-21", end: "2028-02-28", label: "Mo. 21 Feb. - Mo. 28 Feb. 2028", price: "€927 p.P." },
-    { start: "2028-02-28", end: "2028-03-06", label: "Mo. 28 Feb. - Mo. 06 März 2028", price: "€927 p.P." },
-    { start: "2028-03-06", end: "2028-03-13", label: "Mo. 06 März - Mo. 13 März 2028", price: "€917 p.P." }
+    { start: "2028-01-10", end: "2028-01-17", label: "Mo. 10 Jan. - Mo. 17 Jan. 2028" },
+    { start: "2028-01-17", end: "2028-01-24", label: "Mo. 17 Jan. - Mo. 24 Jan. 2028" },
+    { start: "2028-01-24", end: "2028-01-31", label: "Mo. 24 Jan. - Mo. 31 Jan. 2028" },
+    { start: "2028-02-07", end: "2028-02-14", label: "Mo. 07 Feb. - Mo. 14 Feb. 2028" },
+    { start: "2028-02-14", end: "2028-02-21", label: "Mo. 14 Feb. - Mo. 21 Feb. 2028" },
+    { start: "2028-02-21", end: "2028-02-28", label: "Mo. 21 Feb. - Mo. 28 Feb. 2028" },
+    { start: "2028-02-28", end: "2028-03-06", label: "Mo. 28 Feb. - Mo. 06 März 2028" },
+    { start: "2028-03-06", end: "2028-03-13", label: "Mo. 06 März - Mo. 13 März 2028" }
   ]
 },
 {
@@ -2211,15 +2283,15 @@
   shipInfo: "Speziell für sonnige Regionen entworfen, begeistert das Schiff mit einer 360°-Promenade direkt über dem Meer. Panoramaglas-Aufzüge, zwei überlange Ziplines und lichtdurchflutete Innenbereiche schaffen eine unvergleichliche Verbindung zum Ozean.",
   fullRoute: "Tag 1: Santos (Abfahrt 18:00) | Tag 2: Camboriu (Tenderbootbetrieb 08:00–17:00) | Tag 3: Seetag (An Bord Aktivitäten) | Tag 4: Punta Del Este (Tenderbootbetrieb 07:00–16:00) | Tag 5: Buenos Aires (08:00–20:00) | Tag 6–7: Seetag (An Bord Aktivitäten) | Tag 8: Santos (Ankunft 08:00)",
   departures: [
-    { start: "2026-12-13", end: "2026-12-20", label: "So. 13 Dez. - So. 20 Dez. 2026", price: "€857 p.P." },
-    { start: "2027-01-03", end: "2027-01-10", label: "So. 03 Jan. - So. 10 Jan. 2027", price: "€957 p.P." },
-    { start: "2027-01-17", end: "2027-01-24", label: "So. 17 Jan. - So. 24 Jan. 2027", price: "€897 p.P." },
-    { start: "2027-01-24", end: "2027-01-31", label: "So. 24 Jan. - So. 31 Jan. 2027", price: "€897 p.P." },
+    { start: "2026-12-13", end: "2026-12-20", label: "So. 13 Dez. - So. 20 Dez. 2026" },
+    { start: "2027-01-03", end: "2027-01-10", label: "So. 03 Jan. - So. 10 Jan. 2027" },
+    { start: "2027-01-17", end: "2027-01-24", label: "So. 17 Jan. - So. 24 Jan. 2027" },
+    { start: "2027-01-24", end: "2027-01-31", label: "So. 24 Jan. - So. 31 Jan. 2027" },
     { start: "2027-01-31", end: "2027-02-07", label: "So. 31 Jan. - So. 07 Feb. 2027" },
-    { start: "2027-02-07", end: "2027-02-14", label: "So. 07 Feb. - So. 14 Feb. 2027", price: "€897 p.P." },
-    { start: "2027-02-14", end: "2027-02-21", label: "So. 14 Feb. - So. 21 Feb. 2027", price: "€857 p.P." },
-    { start: "2027-02-21", end: "2027-02-28", label: "So. 21 Feb. - So. 28 Feb. 2027", price: "€887 p.P." },
-    { start: "2027-02-28", end: "2027-03-07", label: "So. 28 Feb. - So. 07 März 2027", price: "€877 p.P." }
+    { start: "2027-02-07", end: "2027-02-14", label: "So. 07 Feb. - So. 14 Feb. 2027" },
+    { start: "2027-02-14", end: "2027-02-21", label: "So. 14 Feb. - So. 21 Feb. 2027" },
+    { start: "2027-02-21", end: "2027-02-28", label: "So. 21 Feb. - So. 28 Feb. 2027" },
+    { start: "2027-02-28", end: "2027-03-07", label: "So. 28 Feb. - So. 07 März 2027" }
   ]
 },
 {
@@ -2233,14 +2305,14 @@
   shipInfo: "Speziell für sonnige Regionen entworfen, begeistert das Schiff mit einer 360°-Promenade direkt über dem Meer. Panoramaglas-Aufzüge, zwei überlange Ziplines und lichtdurchflutete Innenbereiche schaffen eine unvergleichliche Verbindung zum Ozean.",
   fullRoute: "Tag 1: Buenos Aires (Abfahrt 20:00) | Tag 2–3: Seetag (An Bord Aktivitäten) | Tag 4: Santos (08:00–18:00) | Tag 5: Camboriu (Tenderbootbetrieb 08:00–17:00) | Tag 6: Seetag (An Bord Aktivitäten) | Tag 7: Punta Del Este (Tenderbootbetrieb 07:00–16:00) | Tag 8: Buenos Aires (Ankunft 08:00)",
   departures: [
-    { start: "2026-12-10", end: "2026-12-17", label: "Do. 10 Dez. - Do. 17 Dez. 2026", price: "€1.311 p.P." },
-    { start: "2026-12-17", end: "2026-12-24", label: "Do. 17 Dez. - Do. 24 Dez. 2026", price: "€1.321 p.P." },
-    { start: "2027-01-21", end: "2027-01-28", label: "Do. 21 Jan. - Do. 28 Jan. 2027", price: "€1.491 p.P." },
-    { start: "2027-01-28", end: "2027-02-04", label: "Do. 28 Jan. - Do. 04 Feb. 2027", price: "€1.261 p.P." },
-    { start: "2027-02-04", end: "2027-02-11", label: "Do. 04 Feb. - Do. 11 Feb. 2027", price: "€1.321 p.P." },
-    { start: "2027-02-11", end: "2027-02-18", label: "Do. 11 Feb. - Do. 18 Feb. 2027", price: "€1.261 p.P." },
-    { start: "2027-02-18", end: "2027-02-25", label: "Do. 18 Feb. - Do. 25 Feb. 2027", price: "€1.311 p.P." },
-    { start: "2027-02-25", end: "2027-03-04", label: "Do. 25 Feb. - Do. 04 März 2027", price: "€1.491 p.P." }
+    { start: "2026-12-10", end: "2026-12-17", label: "Do. 10 Dez. - Do. 17 Dez. 2026" },
+    { start: "2026-12-17", end: "2026-12-24", label: "Do. 17 Dez. - Do. 24 Dez. 2026" },
+    { start: "2027-01-21", end: "2027-01-28", label: "Do. 21 Jan. - Do. 28 Jan. 2027" },
+    { start: "2027-01-28", end: "2027-02-04", label: "Do. 28 Jan. - Do. 04 Feb. 2027" },
+    { start: "2027-02-04", end: "2027-02-11", label: "Do. 04 Feb. - Do. 11 Feb. 2027" },
+    { start: "2027-02-11", end: "2027-02-18", label: "Do. 11 Feb. - Do. 18 Feb. 2027" },
+    { start: "2027-02-18", end: "2027-02-25", label: "Do. 18 Feb. - Do. 25 Feb. 2027" },
+    { start: "2027-02-25", end: "2027-03-04", label: "Do. 25 Feb. - Do. 04 März 2027" }
   ]
 },
 {
@@ -2254,14 +2326,14 @@
   shipInfo: "Speziell für sonnige Regionen entworfen, begeistert das Schiff mit einer 360°-Promenade direkt über dem Meer. Panoramaglas-Aufzüge, zwei überlange Ziplines und lichtdurchflutete Innenbereiche schaffen eine unvergleichliche Verbindung zum Ozean.",
   fullRoute: "Tag 1: Camboriu (Abfahrt 17:00) | Tag 2: Seetag (An Bord Aktivitäten) | Tag 3: Punta Del Este (Tenderbootbetrieb 07:00–16:00) | Tag 4: Buenos Aires (08:00–20:00) | Tag 5–6: Seetag (An Bord Aktivitäten) | Tag 7: Santos (08:00–18:00) | Tag 8: Camboriu (Ankunft 08:00)",
   departures: [
-    { start: "2026-12-14", end: "2026-12-21", label: "Mo. 14 Dez. - Mo. 21 Dez. 2026", price: "€907 p.P." },
-    { start: "2027-01-04", end: "2027-01-11", label: "Mo. 04 Jan. - Mo. 11 Jan. 2027", price: "€957 p.P." },
-    { start: "2027-01-18", end: "2027-01-25", label: "Mo. 18 Jan. - Mo. 25 Jan. 2027", price: "€897 p.P." },
-    { start: "2027-01-25", end: "2027-02-01", label: "Mo. 25 Jan. - Mo. 01 Feb. 2027", price: "€897 p.P." },
-    { start: "2027-02-01", end: "2027-02-08", label: "Mo. 01 Feb. - Mo. 08 Feb. 2027", price: "€887 p.P." },
-    { start: "2027-02-08", end: "2027-02-15", label: "Mo. 08 Feb. - Mo. 15 Feb. 2027", price: "€897 p.P." },
-    { start: "2027-02-15", end: "2027-02-22", label: "Mo. 15 Feb. - Mo. 22 Feb. 2027", price: "€917 p.P." },
-    { start: "2027-02-22", end: "2027-03-01", label: "Mo. 22 Feb. - Mo. 01 März 2027", status: "Ausverkauft" }
+    { start: "2026-12-14", end: "2026-12-21", label: "Mo. 14 Dez. - Mo. 21 Dez. 2026" },
+    { start: "2027-01-04", end: "2027-01-11", label: "Mo. 04 Jan. - Mo. 11 Jan. 2027" },
+    { start: "2027-01-18", end: "2027-01-25", label: "Mo. 18 Jan. - Mo. 25 Jan. 2027" },
+    { start: "2027-01-25", end: "2027-02-01", label: "Mo. 25 Jan. - Mo. 01 Feb. 2027" },
+    { start: "2027-02-01", end: "2027-02-08", label: "Mo. 01 Feb. - Mo. 08 Feb. 2027" },
+    { start: "2027-02-08", end: "2027-02-15", label: "Mo. 08 Feb. - Mo. 15 Feb. 2027" },
+    { start: "2027-02-15", end: "2027-02-22", label: "Mo. 15 Feb. - Mo. 22 Feb. 2027" },
+    { start: "2027-02-22", end: "2027-03-01", label: "Mo. 22 Feb. - Mo. 01 März 2027" }
   ]
 },
 {
@@ -2275,34 +2347,34 @@
   shipInfo: "Ein glamouröses Schiff der Meraviglia-Plus-Klasse mit einer imposanten Indoor-Promenade unter dem LED-Himmel. Besondere Highlights sind die Weltneuheit der „Robotic Bar“ mit Roboter-Barkeeper Rob, exklusive Bühnenshows der Carousel Productions at Sea und ein umfangreiches Shopping-Angebot.",
   fullRoute: "Tag 1: Santos (Abfahrt 17:00) | Tag 2: Buzios (Tenderbootbetrieb 09:00–19:00) | Tag 3: Seetag (An Bord Aktivitäten) | Tag 4: Salvador (08:00–17:00) | Tag 5: Maceio (09:00–17:00) | Tag 6–7: Seetag (An Bord Aktivitäten) | Tag 8: Santos (Ankunft 06:00)",
   departures: [
-    { start: "2026-12-05", end: "2026-12-12", label: "Sa. 05 Dez. - Sa. 12 Dez. 2026", price: "€991 p.P." },
-    { start: "2026-12-12", end: "2026-12-19", label: "Sa. 12 Dez. - Sa. 19 Dez. 2026", price: "€1.111 p.P." },
-    { start: "2026-12-19", end: "2026-12-26", label: "Sa. 19 Dez. - Sa. 26 Dez. 2026", price: "€1.281 p.P." },
-    { start: "2027-01-02", end: "2027-01-09", label: "Sa. 02 Jan. - Sa. 09 Jan. 2027", price: "€1.017 p.P." },
-    { start: "2027-01-09", end: "2027-01-16", label: "Sa. 09 Jan. - Sa. 16 Jan. 2027", price: "€1.282 p.P." },
-    { start: "2027-01-16", end: "2027-01-23", label: "Sa. 16 Jan. - Sa. 23 Jan. 2027", price: "€1.017 p.P." },
-    { start: "2027-01-23", end: "2027-01-30", label: "Sa. 23 Jan. - Sa. 30 Jan. 2027", price: "€1.017 p.P." },
-    { start: "2027-01-30", end: "2027-02-06", label: "Sa. 30 Jan. - Sa. 06 Feb. 2027", price: "€1.017 p.P." },
-    { start: "2027-02-06", end: "2027-02-13", label: "Sa. 06 Feb. - Sa. 13 Feb. 2027", price: "€1.151 p.P." },
-    { start: "2027-02-13", end: "2027-02-20", label: "Sa. 13 Feb. - Sa. 20 Feb. 2027", price: "€877 p.P." },
-    { start: "2027-02-20", end: "2027-02-27", label: "Sa. 20 Feb. - Sa. 27 Feb. 2027", price: "€877 p.P." },
-    { start: "2027-02-27", end: "2027-03-06", label: "Sa. 27 Feb. - Sa. 06 März 2027", price: "€1.041 p.P." },
-    { start: "2027-03-06", end: "2027-03-13", label: "Sa. 06 März - Sa. 13 März 2027", price: "€1.051 p.P." },
-    { start: "2027-03-13", end: "2027-03-20", label: "Sa. 13 März - Sa. 20 März 2027", price: "€877 p.P." },
-    { start: "2027-03-20", end: "2027-03-27", label: "Sa. 20 März - Sa. 27 März 2027", price: "€887 p.P." },
-    { start: "2027-03-27", end: "2027-04-03", label: "Sa. 27 März - Sa. 03 Apr. 2027", price: "€991 p.P." },
-    { start: "2027-12-04", end: "2027-12-11", label: "Sa. 04 Dez. - Sa. 11 Dez. 2027", price: "€837 p.P." },
-    { start: "2028-01-08", end: "2028-01-15", label: "Sa. 08 Jan. - Sa. 15 Jan. 2028", price: "€1.007 p.P." },
-    { start: "2028-01-15", end: "2028-01-22", label: "Sa. 15 Jan. - Sa. 22 Jan. 2028", price: "€1.057 p.P." },
-    { start: "2028-01-22", end: "2028-01-29", label: "Sat. 22 Jan. - Sat. 29 Jan. 2028", price: "€1.007 p.P." },
-    { start: "2028-01-29", end: "2028-02-05", label: "Sa. 29 Jan. - Sa. 05 Feb. 2028", price: "€1.007 p.P." },
-    { start: "2028-02-05", end: "2028-02-12", label: "Sa. 05 Feb. - Sa. 12 Feb. 2028", price: "€917 p.P." },
-    { start: "2028-02-12", end: "2028-02-19", label: "Sa. 12 Feb. - Sa. 19 Feb. 2028", price: "€867 p.P." },
-    { start: "2028-02-19", end: "2028-02-26", label: "Sa. 19 Feb. - Sa. 26 Feb. 2028", price: "€867 p.P." },
-    { start: "2028-02-26", end: "2028-03-04", label: "Sa. 26 Feb. - Sa. 04 März 2028", price: "€927 p.P." },
-    { start: "2028-03-04", end: "2028-03-11", label: "Sa. 04 März - Sa. 11 März 2028", price: "€867 p.P." },
-    { start: "2028-03-11", end: "2028-03-18", label: "Sa. 11 März - Sa. 18 März 2028", price: "€867 p.P." },
-    { start: "2028-03-18", end: "2028-03-25", label: "Sa. 18 März - Sa. 25 März 2028", price: "€867 p.P." }
+    { start: "2026-12-05", end: "2026-12-12", label: "Sa. 05 Dez. - Sa. 12 Dez. 2026" },
+    { start: "2026-12-12", end: "2026-12-19", label: "Sa. 12 Dez. - Sa. 19 Dez. 2026" },
+    { start: "2026-12-19", end: "2026-12-26", label: "Sa. 19 Dez. - Sa. 26 Dez. 2026" },
+    { start: "2027-01-02", end: "2027-01-09", label: "Sa. 02 Jan. - Sa. 09 Jan. 2027" },
+    { start: "2027-01-09", end: "2027-01-16", label: "Sa. 09 Jan. - Sa. 16 Jan. 2027" },
+    { start: "2027-01-16", end: "2027-01-23", label: "Sa. 16 Jan. - Sa. 23 Jan. 2027" },
+    { start: "2027-01-23", end: "2027-01-30", label: "Sa. 23 Jan. - Sa. 30 Jan. 2027" },
+    { start: "2027-01-30", end: "2027-02-06", label: "Sa. 30 Jan. - Sa. 06 Feb. 2027" },
+    { start: "2027-02-06", end: "2027-02-13", label: "Sa. 06 Feb. - Sa. 13 Feb. 2027" },
+    { start: "2027-02-13", end: "2027-02-20", label: "Sa. 13 Feb. - Sa. 20 Feb. 2027" },
+    { start: "2027-02-20", end: "2027-02-27", label: "Sa. 20 Feb. - Sa. 27 Feb. 2027" },
+    { start: "2027-02-27", end: "2027-03-06", label: "Sa. 27 Feb. - Sa. 06 März 2027" },
+    { start: "2027-03-06", end: "2027-03-13", label: "Sa. 06 März - Sa. 13 März 2027" },
+    { start: "2027-03-13", end: "2027-03-20", label: "Sa. 13 März - Sa. 20 März 2027" },
+    { start: "2027-03-20", end: "2027-03-27", label: "Sa. 20 März - Sa. 27 März 2027" },
+    { start: "2027-03-27", end: "2027-04-03", label: "Sa. 27 März - Sa. 03 Apr. 2027" },
+    { start: "2027-12-04", end: "2027-12-11", label: "Sa. 04 Dez. - Sa. 11 Dez. 2027" },
+    { start: "2028-01-08", end: "2028-01-15", label: "Sa. 08 Jan. - Sa. 15 Jan. 2028" },
+    { start: "2028-01-15", end: "2028-01-22", label: "Sa. 15 Jan. - Sa. 22 Jan. 2028" },
+    { start: "2028-01-22", end: "2028-01-29", label: "Sat. 22 Jan. - Sat. 29 Jan. 2028" },
+    { start: "2028-01-29", end: "2028-02-05", label: "Sa. 29 Jan. - Sa. 05 Feb. 2028" },
+    { start: "2028-02-05", end: "2028-02-12", label: "Sa. 05 Feb. - Sa. 12 Feb. 2028" },
+    { start: "2028-02-12", end: "2028-02-19", label: "Sa. 12 Feb. - Sa. 19 Feb. 2028" },
+    { start: "2028-02-19", end: "2028-02-26", label: "Sa. 19 Feb. - Sa. 26 Feb. 2028" },
+    { start: "2028-02-26", end: "2028-03-04", label: "Sa. 26 Feb. - Sa. 04 März 2028" },
+    { start: "2028-03-04", end: "2028-03-11", label: "Sa. 04 März - Sa. 11 März 2028" },
+    { start: "2028-03-11", end: "2028-03-18", label: "Sa. 11 März - Sa. 18 März 2028" },
+    { start: "2028-03-18", end: "2028-03-25", label: "Sa. 18 März - Sa. 25 März 2028" }
   ]
 },
 {
@@ -2316,30 +2388,30 @@
   shipInfo: "Ein glamouröses Schiff der Meraviglia-Plus-Klasse mit einer imposanten Indoor-Promenade unter dem LED-Himmel. Besondere Highlights sind die Weltneuheit der „Robotic Bar“ mit Roboter-Barkeeper Rob, exklusive Bühnenshows der Carousel Productions at Sea und ein umfangreiches Shopping-Angebot.",
   fullRoute: "Tag 1: Maceio (Abfahrt 17:00) | Tag 2–3: Seetag (An Bord Aktivitäten) | Tag 4: Santos (06:00–17:00) | Tag 5: Buzios (Tenderbootbetrieb 09:00–19:00) | Tag 6: Seetag (An Bord Aktivitäten) | Tag 7: Salvador (08:00–17:00) | Tag 8: Maceio (Ankunft 09:00)",
   departures: [
-    { start: "2026-12-09", end: "2026-12-16", label: "Mi. 09 Dez. - Mi. 16 Dez. 2026", status: "Ausverkauft" },
-    { start: "2026-12-16", end: "2026-12-23", label: "Mi. 16 Dez. - Mi. 23 Dez. 2026", status: "Ausverkauft" },
-    { start: "2027-01-06", end: "2027-01-13", label: "Mi. 06 Jan. - Mi. 13 Jan. 2027", price: "€1.037 p.P." },
-    { start: "2027-01-13", end: "2027-01-20", label: "Mi. 13 Jan. - Mi. 20 Jan. 2027", price: "€1.027 p.P." },
-    { start: "2027-01-20", end: "2027-01-27", label: "Mi. 20 Jan. - Mi. 27 Jan. 2027", price: "€1.027 p.P." },
-    { start: "2027-01-27", end: "2027-02-03", label: "Mi. 27 Jan. - Mi. 03 Feb. 2027", status: "Ausverkauft" },
-    { start: "2027-02-03", end: "2027-02-10", label: "Mi. 03 Feb. - Mi. 10 Feb. 2027", status: "Ausverkauft" },
-    { start: "2027-02-10", end: "2027-02-17", label: "Mi. 10 Feb. - Mi. 17 Feb. 2027", price: "€1.131 p.P." },
-    { start: "2027-02-17", end: "2027-02-24", label: "Mi. 17 Feb. - Mi. 24 Feb. 2027", price: "€1.141 p.P." },
-    { start: "2027-02-24", end: "2027-03-03", label: "Mi. 24 Feb. - Mi. 03 März 2027", status: "Ausverkauft" },
-    { start: "2027-03-03", end: "2027-03-10", label: "Mi. 03 März - Mi. 10 März 2027", price: "€897 p.P." },
-    { start: "2027-03-10", end: "2027-03-17", label: "Mi. 10 März - Mi. 17 März 2027", status: "Ausverkauft" },
-    { start: "2027-03-17", end: "2027-03-24", label: "Mi. 17 März - Mi. 24 März 2027", price: "€1.141 p.P." },
-    { start: "2027-03-24", end: "2027-03-31", label: "Mi. 24 März - Mi. 31 März 2027", price: "€1.181 p.P." },
-    { start: "2028-01-12", end: "2028-01-19", label: "Mi. 12 Jan. - Mi. 19 Jan. 2028", price: "€1.057 p.P." },
-    { start: "2028-01-19", end: "2028-01-26", label: "Mi. 19 Jan. - Mi. 26 Jan. 2028", price: "€1.057 p.P." },
-    { start: "2028-01-26", end: "2028-02-02", label: "Mi. 26 Jan. - Mi. 02 Feb. 2028", price: "€1.221 p.P." },
-    { start: "2028-02-02", end: "2028-02-09", label: "Mi. 02 Feb. - Mi. 09 Feb. 2028", price: "€977 p.P." },
-    { start: "2028-02-09", end: "2028-02-16", label: "Mi. 09 Feb. - Mi. 16 Feb. 2028", price: "€917 p.P." },
-    { start: "2028-02-16", end: "2028-02-23", label: "Mi. 16 Feb. - Mi. 23 Feb. 2028", price: "€917 p.P." },
-    { start: "2028-02-23", end: "2028-03-01", label: "Mi. 23 Feb. - Mi. 01 März 2028", price: "€917 p.P." },
-    { start: "2028-03-01", end: "2028-03-08", label: "Mi. 01 März - Mi. 08 März 2028", price: "€917 p.P." },
-    { start: "2028-03-08", end: "2028-03-15", label: "Mi. 08 März - Mi. 15 März 2028", price: "€917 p.P." },
-    { start: "2028-03-15", end: "2028-03-22", label: "Mi. 15 März - Mi. 22 März 2028", price: "€917 p.P." }
+    { start: "2026-12-09", end: "2026-12-16", label: "Mi. 09 Dez. - Mi. 16 Dez. 2026" },
+    { start: "2026-12-16", end: "2026-12-23", label: "Mi. 16 Dez. - Mi. 23 Dez. 2026" },
+    { start: "2027-01-06", end: "2027-01-13", label: "Mi. 06 Jan. - Mi. 13 Jan. 2027" },
+    { start: "2027-01-13", end: "2027-01-20", label: "Mi. 13 Jan. - Mi. 20 Jan. 2027" },
+    { start: "2027-01-20", end: "2027-01-27", label: "Mi. 20 Jan. - Mi. 27 Jan. 2027" },
+    { start: "2027-01-27", end: "2027-02-03", label: "Mi. 27 Jan. - Mi. 03 Feb. 2027" },
+    { start: "2027-02-03", end: "2027-02-10", label: "Mi. 03 Feb. - Mi. 10 Feb. 2027" },
+    { start: "2027-02-10", end: "2027-02-17", label: "Mi. 10 Feb. - Mi. 17 Feb. 2027" },
+    { start: "2027-02-17", end: "2027-02-24", label: "Mi. 17 Feb. - Mi. 24 Feb. 2027" },
+    { start: "2027-02-24", end: "2027-03-03", label: "Mi. 24 Feb. - Mi. 03 März 2027" },
+    { start: "2027-03-03", end: "2027-03-10", label: "Mi. 03 März - Mi. 10 März 2027" },
+    { start: "2027-03-10", end: "2027-03-17", label: "Mi. 10 März - Mi. 17 März 2027" },
+    { start: "2027-03-17", end: "2027-03-24", label: "Mi. 17 März - Mi. 24 März 2027" },
+    { start: "2027-03-24", end: "2027-03-31", label: "Mi. 24 März - Mi. 31 März 2027" },
+    { start: "2028-01-12", end: "2028-01-19", label: "Mi. 12 Jan. - Mi. 19 Jan. 2028" },
+    { start: "2028-01-19", end: "2028-01-26", label: "Mi. 19 Jan. - Mi. 26 Jan. 2028" },
+    { start: "2028-01-26", end: "2028-02-02", label: "Mi. 26 Jan. - Mi. 02 Feb. 2028" },
+    { start: "2028-02-02", end: "2028-02-09", label: "Mi. 02 Feb. - Mi. 09 Feb. 2028" },
+    { start: "2028-02-09", end: "2028-02-16", label: "Mi. 09 Feb. - Mi. 16 Feb. 2028" },
+    { start: "2028-02-16", end: "2028-02-23", label: "Mi. 16 Feb. - Mi. 23 Feb. 2028" },
+    { start: "2028-02-23", end: "2028-03-01", label: "Mi. 23 Feb. - Mi. 01 März 2028" },
+    { start: "2028-03-01", end: "2028-03-08", label: "Mi. 01 März - Mi. 08 März 2028" },
+    { start: "2028-03-08", end: "2028-03-15", label: "Mi. 08 März - Mi. 15 März 2028" },
+    { start: "2028-03-15", end: "2028-03-22", label: "Mi. 15 März - Mi. 22 März 2028" }
   ]
 },
 {
@@ -2353,31 +2425,31 @@
   shipInfo: "Ein glamouröses Schiff der Meraviglia-Plus-Klasse mit einer imposanten Indoor-Promenade unter dem LED-Himmel. Besondere Highlights sind die Weltneuheit der „Robotic Bar“ mit Roboter-Barkeeper Rob, exklusive Bühnenshows der Carousel Productions at Sea und ein umfangreiches Shopping-Angebot.",
   fullRoute: "Tag 1: Salvador (Abfahrt 17:00) | Tag 2: Maceio (09:00–17:00) | Tag 3–4: Seetag (An Bord Aktivitäten) | Tag 5: Santos (06:00–17:00) | Tag 6: Buzios (Tenderbootbetrieb 09:00–19:00) | Tag 7: Seetag (An Bord Aktivitäten) | Tag 8: Salvador (Ankunft 08:00)",
   departures: [
-    { start: "2026-12-08", end: "2026-12-15", label: "Di. 08 Dez. - Di. 15 Dez. 2026", status: "Ausverkauft" },
-    { start: "2026-12-15", end: "2026-12-22", label: "Di. 15 Dez. - Di. 22 Dez. 2026", price: "€991 p.P." },
-    { start: "2026-12-22", end: "2026-12-29", label: "Di. 22 Dez. - Di. 29 Dez. 2026", price: "€1.331 p.P." },
-    { start: "2027-01-05", end: "2027-01-12", label: "Di. 05 Jan. - Di. 12 Jan. 2027", price: "€1.077 p.P." },
-    { start: "2027-01-12", end: "2027-01-19", label: "Di. 12 Jan. - Di. 19 Jan. 2027", price: "€1.057 p.P." },
-    { start: "2027-01-19", end: "2027-01-26", label: "Di. 19 Jan. - Di. 26 Jan. 2027", price: "€1.097 p.P." },
-    { start: "2027-01-26", end: "2027-02-02", label: "Di. 26 Jan. - Di. 02 Feb. 2027", price: "€1.057 p.P." },
-    { start: "2027-02-02", end: "2027-02-09", label: "Di. 02 Feb. - Di. 09 Feb. 2027", price: "€1.551 p.P." },
-    { start: "2027-02-09", end: "2027-02-16", label: "Di. 09 Feb. - Di. 16 Feb. 2027", price: "€937 p.P." },
-    { start: "2027-02-16", end: "2027-02-23", label: "Di. 16 Feb. - Di. 23 Feb. 2027", price: "€1.371 p.P." },
-    { start: "2027-02-23", end: "2027-03-02", label: "Di. 23 Feb. - Di. 02 März 2027", price: "€1.261 p.P." },
-    { start: "2027-03-02", end: "2027-03-09", label: "Di. 02 März - Di. 09 März 2027", price: "€1.261 p.P." },
-    { start: "2027-03-09", end: "2027-03-16", label: "Di. 09 März - Di. 16 März 2027", price: "€917 p.P." },
-    { start: "2027-03-16", end: "2027-03-23", label: "Di. 16 März - Di. 23 März 2027", price: "€1.181 p.P." },
-    { start: "2027-03-23", end: "2027-03-30", label: "Di. 23 März - Di. 30 März 2027", price: "€1.181 p.P." },
-    { start: "2028-01-11", end: "2028-01-18", label: "Di. 11 Jan. - Di. 18 Jan. 2028", price: "€1.067 p.P." },
-    { start: "2028-01-18", end: "2028-01-25", label: "Di. 18 Jan. - Di. 25 Jan. 2028", price: "€1.067 p.P." },
-    { start: "2028-01-25", end: "2028-02-01", label: "Di. 25 Jan. - Di. 01 Feb. 2028", price: "€1.221 p.P." },
-    { start: "2028-02-01", end: "2028-02-08", label: "Di. 01 Feb. - Di. 08 Feb. 2028", price: "€1.057 p.P." },
-    { start: "2028-02-08", end: "2028-02-15", label: "Di. 08 Feb. - Di. 15 Feb. 2028", price: "€967 p.P." },
-    { start: "2028-02-15", end: "2028-02-22", label: "Di. 15 Feb. - Di. 22 Feb. 2028", price: "€1.081 p.P." },
-    { start: "2028-02-22", end: "2028-02-29", label: "Di. 22 Feb. - Di. 29 Feb. 2028", price: "€1.162 p.P." },
-    { start: "2028-02-29", end: "2028-03-07", label: "Di. 29 Feb. - Di. 07 März 2028", price: "€917 p.P." },
-    { start: "2028-03-07", end: "2028-03-14", label: "Di. 07 März - Di. 14 März 2028", price: "€917 p.P." },
-    { start: "2028-03-14", end: "2028-03-21", label: "Di. 14 März - Di. 21 März 2028", price: "€917 p.P." }
+    { start: "2026-12-08", end: "2026-12-15", label: "Di. 08 Dez. - Di. 15 Dez. 2026" },
+    { start: "2026-12-15", end: "2026-12-22", label: "Di. 15 Dez. - Di. 22 Dez. 2026" },
+    { start: "2026-12-22", end: "2026-12-29", label: "Di. 22 Dez. - Di. 29 Dez. 2026" },
+    { start: "2027-01-05", end: "2027-01-12", label: "Di. 05 Jan. - Di. 12 Jan. 2027" },
+    { start: "2027-01-12", end: "2027-01-19", label: "Di. 12 Jan. - Di. 19 Jan. 2027" },
+    { start: "2027-01-19", end: "2027-01-26", label: "Di. 19 Jan. - Di. 26 Jan. 2027" },
+    { start: "2027-01-26", end: "2027-02-02", label: "Di. 26 Jan. - Di. 02 Feb. 2027" },
+    { start: "2027-02-02", end: "2027-02-09", label: "Di. 02 Feb. - Di. 09 Feb. 2027" },
+    { start: "2027-02-09", end: "2027-02-16", label: "Di. 09 Feb. - Di. 16 Feb. 2027" },
+    { start: "2027-02-16", end: "2027-02-23", label: "Di. 16 Feb. - Di. 23 Feb. 2027" },
+    { start: "2027-02-23", end: "2027-03-02", label: "Di. 23 Feb. - Di. 02 März 2027" },
+    { start: "2027-03-02", end: "2027-03-09", label: "Di. 02 März - Di. 09 März 2027" },
+    { start: "2027-03-09", end: "2027-03-16", label: "Di. 09 März - Di. 16 März 2027" },
+    { start: "2027-03-16", end: "2027-03-23", label: "Di. 16 März - Di. 23 März 2027" },
+    { start: "2027-03-23", end: "2027-03-30", label: "Di. 23 März - Di. 30 März 2027" },
+    { start: "2028-01-11", end: "2028-01-18", label: "Di. 11 Jan. - Di. 18 Jan. 2028" },
+    { start: "2028-01-18", end: "2028-01-25", label: "Di. 18 Jan. - Di. 25 Jan. 2028" },
+    { start: "2028-01-25", end: "2028-02-01", label: "Di. 25 Jan. - Di. 01 Feb. 2028" },
+    { start: "2028-02-01", end: "2028-02-08", label: "Di. 01 Feb. - Di. 08 Feb. 2028" },
+    { start: "2028-02-08", end: "2028-02-15", label: "Di. 08 Feb. - Di. 15 Feb. 2028" },
+    { start: "2028-02-15", end: "2028-02-22", label: "Di. 15 Feb. - Di. 22 Feb. 2028" },
+    { start: "2028-02-22", end: "2028-02-29", label: "Di. 22 Feb. - Di. 29 Feb. 2028" },
+    { start: "2028-02-29", end: "2028-03-07", label: "Di. 29 Feb. - Di. 07 März 2028" },
+    { start: "2028-03-07", end: "2028-03-14", label: "Di. 07 März - Di. 14 März 2028" },
+    { start: "2028-03-14", end: "2028-03-21", label: "Di. 14 März - Di. 21 März 2028" }
   ]
 },
 {
@@ -4549,9 +4621,9 @@
   shipInfo: "Modernes Schiff der Meraviglia‑Klasse mit großer Promenade, vielfältigen Restaurants und spektakulären Entertainment‑Shows. Ideal für Gäste, die Atlantik‑ und Iberienhäfen kombinieren möchten.",
   fullRoute: "Tag 1: Southampton (Abfahrt 16:00) | Tag 2: Seetag (An Bord Aktivitäten) | Tag 3: Gijon (07:00–17:00) | Tag 4: La Rochelle (09:00–19:00) | Tag 5: Bilbao (09:00–19:00) | Tag 6: Seetag (An Bord Aktivitäten) | Tag 7: Cherbourg (07:00–19:00) | Tag 8: Southampton (Ankunft 07:00)",
   departures: [
-    { start: "2027-09-04", end: "2027-09-11", label: "Sa. 04 Sept. 2027 - Sa. 11 Sept. 2027", price: "€959 p.P." },
-    { start: "2027-05-29", end: "2027-06-05", label: "Sa. 29 Mai 2027 - Sa. 05 Juni 2027", price: "€1.189 p.P." },
-    { start: "2027-10-23", end: "2027-10-30", label: "Sa. 23 Okt. 2027 - Sa. 30 Okt. 2027", price: "€989 p.P." }
+    { start: "2027-09-04", end: "2027-09-11", label: "Sa. 04 Sept. 2027 - Sa. 11 Sept. 2027" },
+    { start: "2027-05-29", end: "2027-06-05", label: "Sa. 29 Mai 2027 - Sa. 05 Juni 2027" },
+    { start: "2027-10-23", end: "2027-10-30", label: "Sa. 23 Okt. 2027 - Sa. 30 Okt. 2027" }
   ]
 },
 {
@@ -4567,9 +4639,9 @@
   shipInfo: "Langstreckenroute der Meraviglia‑Klasse: großzügige Promenade, vielfältige Restaurants und ein umfangreiches Entertainment‑Programm kombiniert mit Atlantik‑Inselhäfen.",
   fullRoute: "Tag 1: Southampton (Abfahrt 16:00) | Tag 2: Seetag (An Bord Aktivitäten) | Tag 3: Vigo (09:00–18:00) | Tag 4: Seetag (An Bord Aktivitäten) | Tag 5: Funchal (09:00–18:00) | Tag 6: Las Palmas (11:00–20:00) | Tag 7: Santa Cruz De Tenerife (08:00–18:00) | Tag 8: Arrecife De Lanzarote (07:00–17:00) | Tag 9: Seetag (An Bord Aktivitäten) | Tag 10: Lissabon (07:00–18:00) | Tag 11–12: Seetag (An Bord Aktivitäten) | Tag 13: Southampton (Ankunft 07:00)",
   departures: [
-    { start: "2028-09-30", end: "2028-10-12", label: "Sa. 30 Sept. 2028 - Do. 12 Okt. 2028", price: "€1.569 p.P." },
-    { start: "2028-05-08", end: "2028-05-20", label: "Mo. 08 Mai 2028 - Sa. 20 Mai 2028", price: "€1.619 p.P." },
-    { start: "2028-08-05", end: "2028-08-17", label: "Sa. 05 Aug. 2028 - Do. 17 Aug. 2028", price: "€1.889 p.P." }
+    { start: "2028-09-30", end: "2028-10-12", label: "Sa. 30 Sept. 2028 - Do. 12 Okt. 2028" },
+    { start: "2028-05-08", end: "2028-05-20", label: "Mo. 08 Mai 2028 - Sa. 20 Mai 2028" },
+    { start: "2028-08-05", end: "2028-08-17", label: "Sa. 05 Aug. 2028 - Do. 17 Aug. 2028" }
   ]
 },
 {
@@ -4585,14 +4657,14 @@
   shipInfo: "Elegante Kombination aus Komfort und Entertainment: großzügige Poolbereiche, vielfältige Restaurants und das exklusive MSC Yacht Club Angebot.",
   fullRoute: "Tag 1: Le Havre (Abfahrt 19:30) | Tag 2: Zeebrugge (08:00–18:00) | Tag 3: Rotterdam (08:00–19:00) | Tag 4: Seetag (An Bord Aktivitäten) | Tag 5: Hamburg (07:00–20:00) | Tag 6: Seetag (An Bord Aktivitäten) | Tag 7: Southampton (07:00–19:30) | Tag 8: Le Havre (Ankunft 09:00)",
   departures: [
-    { start: "2028-02-14", end: "2028-02-21", label: "Mo. 14 Feb. 2028 - Mo. 21 Feb. 2028", price: "€609 p.P." },
-    { start: "2027-11-01", end: "2027-11-08", label: "Mo. 01 Nov. 2027 - Mo. 08 Nov. 2027", price: "€729 p.P." },
-    { start: "2027-11-08", end: "2027-11-15", label: "Mo. 08 Nov. 2027 - Mo. 15 Nov. 2027", price: "€679 p.P." },
-    { start: "2027-11-22", end: "2027-11-29", label: "Mo. 22 Nov. 2027 - Mo. 29 Nov. 2027", price: "€679 p.P." },
-    { start: "2027-12-06", end: "2027-12-13", label: "Mo. 06 Dez. 2027 - Mo. 13 Dez. 2027", price: "€649 p.P." },
-    { start: "2027-12-13", end: "2027-12-20", label: "Mo. 13 Dez. 2027 - Mo. 20 Dez. 2027", price: "€679 p.P." },
-    { start: "2027-12-20", end: "2027-12-27", label: "Mo. 20 Dez. 2027 - Mo. 27 Dez. 2027", price: "€1.109 p.P." },
-    { start: "2027-12-27", end: "2028-01-03", label: "Mo. 27 Dez. 2027 - Mo. 03 Jan. 2028", price: "€1.249 p.P." }
+    { start: "2028-02-14", end: "2028-02-21", label: "Mo. 14 Feb. 2028 - Mo. 21 Feb. 2028" },
+    { start: "2027-11-01", end: "2027-11-08", label: "Mo. 01 Nov. 2027 - Mo. 08 Nov. 2027" },
+    { start: "2027-11-08", end: "2027-11-15", label: "Mo. 08 Nov. 2027 - Mo. 15 Nov. 2027" },
+    { start: "2027-11-22", end: "2027-11-29", label: "Mo. 22 Nov. 2027 - Mo. 29 Nov. 2027" },
+    { start: "2027-12-06", end: "2027-12-13", label: "Mo. 06 Dez. 2027 - Mo. 13 Dez. 2027" },
+    { start: "2027-12-13", end: "2027-12-20", label: "Mo. 13 Dez. 2027 - Mo. 20 Dez. 2027" },
+    { start: "2027-12-20", end: "2027-12-27", label: "Mo. 20 Dez. 2027 - Mo. 27 Dez. 2027" },
+    { start: "2027-12-27", end: "2028-01-03", label: "Mo. 27 Dez. 2027 - Mo. 03 Jan. 2028" }
   ]
 },
 {
@@ -4608,9 +4680,9 @@
     "shipInfo": "Modernes Schiff der Meraviglia‑Klasse mit großer Promenade, vielfältigen Restaurants und spektakulären Entertainment‑Shows.",
     "fullRoute": "Tag 1: Southampton (Abfahrt 16:00) | Tag 2: Seetag (An Bord Aktivitäten) | Tag 3: Gijon (07:00–17:00) | Tag 4: La Rochelle (09:00–19:00) | Tag 5: Bilbao (09:00–19:00) | Tag 6: Seetag (An Bord Aktivitäten) | Tag 7: Cherbourg (07:00–19:00) | Tag 8: Southampton (Ankunft 07:00)",
     "departures": [
-      { "start": "2027-09-04", "end": "2027-09-11", "label": "Sa. 04 Sept. 2027 - Sa. 11 Sept. 2027", "price": "€959 p.P." },
-      { "start": "2027-05-29", "end": "2027-06-05", "label": "Sa. 29 Mai 2027 - Sa. 05 Juni 2027", "price": "€1.189 p.P." },
-      { "start": "2027-10-23", "end": "2027-10-30", "label": "Sa. 23 Okt. 2027 - Sa. 30 Okt. 2027", "price": "€989 p.P." }
+      { "start": "2027-09-04", "end": "2027-09-11", "label": "Sa. 04 Sept. 2027 - Sa. 11 Sept. 2027" },
+      { "start": "2027-05-29", "end": "2027-06-05", "label": "Sa. 29 Mai 2027 - Sa. 05 Juni 2027" },
+      { "start": "2027-10-23", "end": "2027-10-30", "label": "Sa. 23 Okt. 2027 - Sa. 30 Okt. 2027" }
   ]
 },
 {
@@ -4626,9 +4698,9 @@
     "shipInfo": "Langstreckenroute der Meraviglia‑Klasse: großzügige Promenade, vielfältige Restaurants und umfangreiches Entertainment.",
     "fullRoute": "Tag 1: Southampton (Abfahrt 16:00) | Tag 2: Seetag (An Bord Aktivitäten) | Tag 3: Vigo (09:00–18:00) | Tag 4: Seetag (An Bord Aktivitäten) | Tag 5: Funchal (09:00–18:00) | Tag 6: Las Palmas (11:00–20:00) | Tag 7: Santa Cruz De Tenerife (08:00–18:00) | Tag 8: Arrecife De Lanzarote (07:00–17:00) | Tag 9: Seetag (An Bord Aktivitäten) | Tag 10: Lissabon (07:00–18:00) | Tag 11–12: Seetag (An Bord Aktivitäten) | Tag 13: Southampton (Ankunft 07:00)",
     "departures": [
-      { "start": "2028-09-30", "end": "2028-10-12", "label": "Sa. 30 Sept. 2028 - Do. 12 Okt. 2028", "price": "€1.569 p.P." },
-      { "start": "2028-05-08", "end": "2028-05-20", "label": "Mo. 08 Mai 2028 - Sa. 20 Mai 2028", "price": "€1.619 p.P." },
-      { "start": "2028-08-05", "end": "2028-08-17", "label": "Sa. 05 Aug. 2028 - Do. 17 Aug. 2028", "price": "€1.889 p.P." }
+      { "start": "2028-09-30", "end": "2028-10-12", "label": "Sa. 30 Sept. 2028 - Do. 12 Okt. 2028" },
+      { "start": "2028-05-08", "end": "2028-05-20", "label": "Mo. 08 Mai 2028 - Sa. 20 Mai 2028" },
+      { "start": "2028-08-05", "end": "2028-08-17", "label": "Sa. 05 Aug. 2028 - Do. 17 Aug. 2028" }
   ]
 },
 {
@@ -4644,14 +4716,14 @@
     "shipInfo": "Elegante Kombination aus Komfort und Entertainment mit großzügigen Poolbereichen und dem MSC Yacht Club.",
     "fullRoute": "Tag 1: Le Havre (Abfahrt 21:30) | Tag 2: Southampton (07:00–19:30) | Tag 3: Seetag (An Bord Aktivitäten) | Tag 4: Hamburg (07:00–20:00) | Tag 5: Seetag (An Bord Aktivitäten) | Tag 6: Zeebrugge (07:00–18:00) | Tag 7: Rotterdam (07:00–17:00) | Tag 8: Le Havre (Ankunft 10:00)",
     "departures": [
-      { "start": "2028-02-14", "end": "2028-02-21", "label": "Mo. 14 Feb. 2028 - Mo. 21 Feb. 2028", "price": "€609 p.P." },
-      { "start": "2027-11-01", "end": "2027-11-08", "label": "Mo. 01 Nov. 2027 - Mo. 08 Nov. 2027", "price": "€729 p.P." },
-      { "start": "2027-11-08", "end": "2027-11-15", "label": "Mo. 08 Nov. 2027 - Mo. 15 Nov. 2027", "price": "€679 p.P." },
-      { "start": "2027-11-22", "end": "2027-11-29", "label": "Mo. 22 Nov. 2027 - Mo. 29 Nov. 2027", "price": "€679 p.P." },
-      { "start": "2027-12-06", "end": "2027-12-13", "label": "Mo. 06 Dez. 2027 - Mo. 13 Dez. 2027", "price": "€649 p.P." },
-      { "start": "2027-12-13", "end": "2027-12-20", "label": "Mo. 13 Dez. 2027 - Mo. 20 Dez. 2027", "price": "€679 p.P." },
-      { "start": "2027-12-20", "end": "2027-12-27", "label": "Mo. 20 Dez. 2027 - Mo. 27 Dez. 2027", "price": "€1.109 p.P." },
-      { "start": "2027-12-27", "end": "2028-01-03", "label": "Mo. 27 Dez. 2027 - Mo. 03 Jan. 2028", "price": "€1.249 p.P." }
+      { "start": "2028-02-14", "end": "2028-02-21", "label": "Mo. 14 Feb. 2028 - Mo. 21 Feb. 2028" },
+      { "start": "2027-11-01", "end": "2027-11-08", "label": "Mo. 01 Nov. 2027 - Mo. 08 Nov. 2027" },
+      { "start": "2027-11-08", "end": "2027-11-15", "label": "Mo. 08 Nov. 2027 - Mo. 15 Nov. 2027" },
+      { "start": "2027-11-22", "end": "2027-11-29", "label": "Mo. 22 Nov. 2027 - Mo. 29 Nov. 2027" },
+      { "start": "2027-12-06", "end": "2027-12-13", "label": "Mo. 06 Dez. 2027 - Mo. 13 Dez. 2027" },
+      { "start": "2027-12-13", "end": "2027-12-20", "label": "Mo. 13 Dez. 2027 - Mo. 20 Dez. 2027" },
+      { "start": "2027-12-20", "end": "2027-12-27", "label": "Mo. 20 Dez. 2027 - Mo. 27 Dez. 2027" },
+      { "start": "2027-12-27", "end": "2028-01-03", "label": "Mo. 27 Dez. 2027 - Mo. 03 Jan. 2028" }
   ]
 },
 {
@@ -4667,12 +4739,12 @@
     "shipInfo": "Elegante Kombination aus Komfort und Entertainment mit großzügigen Poolbereichen und dem MSC Yacht Club.",
     "fullRoute": "Tag 1: Rotterdam (Abfahrt 19:00) | Tag 2: Seetag (An Bord Aktivitäten) | Tag 3: Hamburg (07:00–20:00) | Tag 4: Seetag (An Bord Aktivitäten) | Tag 5: Southampton (07:00–19:30) | Tag 6: Le Havre (09:00–19:30) | Tag 7: Zeebrugge (08:00–18:00) | Tag 8: Rotterdam (Ankunft 08:00)",
     "departures": [
-      { "start": "2028-01-05", "end": "2028-01-12", "label": "Mi. 05 Jan. 2028 - Mi. 12 Jan. 2028", "price": "€609 p.P." },
-      { "start": "2027-11-03", "end": "2027-11-10", "label": "Mi. 03 Nov. 2027 - Mi. 10 Nov. 2027", "price": "€679 p.P." },
-      { "start": "2027-12-08", "end": "2027-12-15", "label": "Mi. 08 Dez. 2027 - Mi. 15 Dez. 2027", "price": "€649 p.P." },
-      { "start": "2027-12-15", "end": "2027-12-22", "label": "Mi. 15 Dez. 2027 - Mi. 22 Dez. 2027", "price": "€709 p.P." },
-      { "start": "2027-12-22", "end": "2027-12-29", "label": "Mi. 22 Dez. 2027 - Mi. 29 Dez. 2027", "price": "€1.109 p.P." },
-      { "start": "2027-12-29", "end": "2028-01-05", "label": "Mi. 29 Dez. 2027 - Mi. 05 Jan. 2028", "price": "€1.289 p.P." }
+      { "start": "2028-01-05", "end": "2028-01-12", "label": "Mi. 05 Jan. 2028 - Mi. 12 Jan. 2028" },
+      { "start": "2027-11-03", "end": "2027-11-10", "label": "Mi. 03 Nov. 2027 - Mi. 10 Nov. 2027" },
+      { "start": "2027-12-08", "end": "2027-12-15", "label": "Mi. 08 Dez. 2027 - Mi. 15 Dez. 2027" },
+      { "start": "2027-12-15", "end": "2027-12-22", "label": "Mi. 15 Dez. 2027 - Mi. 22 Dez. 2027" },
+      { "start": "2027-12-22", "end": "2027-12-29", "label": "Mi. 22 Dez. 2027 - Mi. 29 Dez. 2027" },
+      { "start": "2027-12-29", "end": "2028-01-05", "label": "Mi. 29 Dez. 2027 - Mi. 05 Jan. 2028" }
   ]
 },
 {
@@ -4688,8 +4760,8 @@
     "shipInfo": "Elegante Kombination aus Komfort und Entertainment mit großzügigen Poolbereichen und dem MSC Yacht Club.",
     "fullRoute": "Tag 1: Rotterdam (Abfahrt 17:00) | Tag 2: Le Havre (10:00–21:30) | Tag 3: Southampton (07:00–19:30) | Tag 4: Seetag (An Bord Aktivitäten) | Tag 5: Hamburg (07:00–20:00) | Tag 6: Seetag (An Bord Aktivitäten) | Tag 7: Zeebrugge (07:00–18:00) | Tag 8: Rotterdam (Ankunft 07:00)",
     "departures": [
-      { "start": "2027-03-03", "end": "2027-03-10", "label": "Mi. 03 März 2027 - Mi. 10 März 2027", "price": "€643 p.P." },
-      { "start": "2026-11-11", "end": "2026-11-18", "label": "Mi. 11 Nov. 2026 - Mi. 18 Nov. 2026", "price": "€883 p.P." }
+      { "start": "2027-03-03", "end": "2027-03-10", "label": "Mi. 03 März 2027 - Mi. 10 März 2027" },
+      { "start": "2026-11-11", "end": "2026-11-18", "label": "Mi. 11 Nov. 2026 - Mi. 18 Nov. 2026" }
   ]
 },
 {
@@ -4705,8 +4777,8 @@
     "shipInfo": "Moderne Expeditions‑inspirierte Ausstattung kombiniert mit MSC‑Komfort für Fjord‑ und Nordkap‑Routen.",
     "fullRoute": "Tag 1: Kopenhagen (Abfahrt 18:00) | Tag 2: Seetag (An Bord Aktivitäten) | Tag 3: Hellesylt (09:00–21:00) | Tag 4: Alesund (07:00–17:00) | Tag 5: Flaam (07:00–18:00) | Tag 6: Seetag (An Bord Aktivitäten) | Tag 7: Kiel (09:00–19:00) | Tag 8: Kopenhagen (Ankunft 08:00)",
     "departures": [
-      { "start": "2027-04-25", "end": "2027-05-02", "label": "So. 25 Apr. 2027 - So. 02 Mai 2027", "price": "€959 p.P." },
-      { "start": "2027-05-02", "end": "2027-05-09", "label": "So. 02 Mai 2027 - So. 09 Mai 2027", "price": "€1.089 p.P." }
+      { "start": "2027-04-25", "end": "2027-05-02", "label": "So. 25 Apr. 2027 - So. 02 Mai 2027" },
+      { "start": "2027-05-02", "end": "2027-05-09", "label": "So. 02 Mai 2027 - So. 09 Mai 2027" }
   ]
 },
 {
@@ -4722,8 +4794,8 @@
     "shipInfo": "Moderne Expeditions‑inspirierte Ausstattung kombiniert mit MSC‑Komfort für Fjord‑Routen inklusive Geiranger.",
     "fullRoute": "Tag 1: Kopenhagen (Abfahrt 18:00) | Tag 2: Seetag (An Bord Aktivitäten) | Tag 3: Hellesylt (09:00–09:45) / Geiranger (12:00–21:00) | Tag 4: Alesund (07:00–17:00) | Tag 5: Flaam (07:00–18:00) | Tag 6: Seetag (An Bord Aktivitäten) | Tag 7: Kiel (09:00–19:00) | Tag 8: Kopenhagen (Ankunft 08:00)",
     "departures": [
-      { "start": "2027-09-12", "end": "2027-09-19", "label": "So. 12 Sept. 2027 - So. 19 Sept. 2027", "price": "€1.079 p.P." },
-      { "start": "2028-09-17", "end": "2028-09-24", "label": "So. 17 Sept. 2028 - So. 24 Sept. 2028", "price": "€1.129 p.P." }
+      { "start": "2027-09-12", "end": "2027-09-19", "label": "So. 12 Sept. 2027 - So. 19 Sept. 2027" },
+      { "start": "2028-09-17", "end": "2028-09-24", "label": "So. 17 Sept. 2028 - So. 24 Sept. 2028" }
   ]
 },
 {
@@ -4739,8 +4811,8 @@
     "shipInfo": "Klassisches MSC‑Erlebnis mit komfortablen Kabinen, vielfältigen Restaurants und Live‑Shows.",
     "fullRoute": "Tag 1: Kopenhagen (Abfahrt 17:00) | Tag 2: Warnemünde (07:00–17:00) | Tag 3: Gdynia (10:00–19:00) | Tag 4: Klaipeda (07:00–15:30) | Tag 5: Riga (07:00–14:30) | Tag 6: Stockholm (08:30–17:00) | Tag 7: Seetag (An Bord Aktivitäten) | Tag 8: Kopenhagen (Ankunft 09:30)",
     "departures": [
-      { "start": "2027-08-21", "end": "2027-08-28", "label": "Sa. 21 Aug. 2027 - Sa. 28 Aug. 2027", "price": "€1.179 p.P." },
-      { "start": "2027-07-24", "end": "2027-07-31", "label": "Sa. 24 Juli 2027 - Sa. 31 Juli 2027", "price": "€1.419 p.P." }
+      { "start": "2027-08-21", "end": "2027-08-28", "label": "Sa. 21 Aug. 2027 - Sa. 28 Aug. 2027" },
+      { "start": "2027-07-24", "end": "2027-07-31", "label": "Sa. 24 Juli 2027 - Sa. 31 Juli 2027" }
   ]
 },
 {
@@ -4756,7 +4828,7 @@
     "shipInfo": "Kompakte Kurzroute mit Fokus auf skandinavische Metropolen und entspanntem Bordprogramm.",
     "fullRoute": "Tag 1: Oslo (Abfahrt 16:00) | Tag 2: Kopenhagen (09:00–18:00) | Tag 3: Warnemünde (07:00–17:00) | Tag 4: Seetag (An Bord Aktivitäten) | Tag 5: Helsinki (08:00–17:00) | Tag 6: Stockholm (Ankunft 08:00)",
     "departures": [
-      { "start": "2028-08-25", "end": "2028-08-30", "label": "Fr. 25 Aug. 2028 - Mi. 30 Aug. 2028", "price": "€769 p.P." }
+      { "start": "2028-08-25", "end": "2028-08-30", "label": "Fr. 25 Aug. 2028 - Mi. 30 Aug. 2028" }
   ]
 },
 {
@@ -4772,8 +4844,8 @@
     "shipInfo": "Einfache Strecke mit mehreren Ostseehäfen und komfortablem Bordservice.",
     "fullRoute": "Tag 1: Oslo (Abfahrt 16:00) | Tag 2: Kopenhagen (09:00–17:00) | Tag 3: Warnemünde (07:00–17:00) | Tag 4: Gdynia (10:00–19:00) | Tag 5: Klaipeda (07:00–15:30) | Tag 6: Riga (07:00–14:30) | Tag 7: Stockholm (Ankunft 09:00)",
     "departures": [
-      { "start": "2027-06-11", "end": "2027-06-17", "label": "Fr. 11 Juni 2027 - Do. 17 Juni 2027", "price": "€1.260 p.P." },
-      { "start": "2027-06-25", "end": "2027-07-01", "label": "Fr. 25 Juni 2027 - Do. 01 Juli 2027", "price": "€1.403 p.P." }
+      { "start": "2027-06-11", "end": "2027-06-17", "label": "Fr. 11 Juni 2027 - Do. 17 Juni 2027" },
+      { "start": "2027-06-25", "end": "2027-07-01", "label": "Fr. 25 Juni 2027 - Do. 01 Juli 2027" }
   ]
 },
 {
@@ -4789,10 +4861,10 @@
   shipInfo: "Spektakuläres Schiff der World-Klasse mit zukunftsweisendem Design und fantastischer kulinarischer Vielfalt. Mit der beeindruckenden Außenseite am Heck, exklusiven Spezialitätenrestaurants und innovativen Erlebniswelten setzt das Schiff Maßstäbe für Familien und Genießer. Auch der größte MSC Yacht Club der Flotte bietet hier exklusive Privatsphäre im Schiff-im-Schiff-Konzept.",
   fullRoute: "Tag 1: Fort De France (Abfahrt 23:00) | Tag 2: Pointe A Pitre (08:00–19:00) | Tag 3: Castries (08:00–18:00) | Tag 4: Bridgetown (08:00–20:00) | Tag 5: Seetag (An Bord Aktivitäten) | Tag 6: Kingstown (09:00–18:00) | Tag 7: Saint George (08:00–18:00) | Tag 8: Fort De France (Ankunft 07:00)",
   departures: [
-    { start: "2027-12-11", end: "2027-12-18", label: "Sa. 11 Dez. 2027 - Sa. 18 Dez. 2027", price: "€949 p.P." },
-    { start: "2027-11-27", end: "2027-12-04", label: "Sa. 27 Nov. 2027 - Sa. 04 Dez. 2027", price: "€999 p.P." },
-    { start: "2028-04-01", end: "2028-04-08", label: "Sa. 01 Apr. 2028 - Sa. 08 Apr. 2028", price: "€1.129 p.P." },
-    { start: "2028-04-15", end: "2028-04-22", label: "Sa. 15 Apr. 2028 - Sa. 22 Apr. 2028", price: "€1.279 p.P." }
+    { start: "2027-12-11", end: "2027-12-18", label: "Sa. 11 Dez. 2027 - Sa. 18 Dez. 2027" },
+    { start: "2027-11-27", end: "2027-12-04", label: "Sa. 27 Nov. 2027 - Sa. 04 Dez. 2027" },
+    { start: "2028-04-01", end: "2028-04-08", label: "Sa. 01 Apr. 2028 - Sa. 08 Apr. 2028" },
+    { start: "2028-04-15", end: "2028-04-22", label: "Sa. 15 Apr. 2028 - Sa. 22 Apr. 2028" }
   ]
 },
 {
@@ -5386,6 +5458,41 @@
             }
         ];
 
+        const shipInfoByShip = {
+            "MSC World Europa": "Innovatives Y-Design als erstes LNG-betriebenes Schiff der Flotte mit weitläufiger Outdoor-Promenade und der spektakulären 11-Decks-Trockenrutsche „Venom Drop“.",
+            "MSC World America": "Erstklassiges Kreuzfahrterlebnis mit dem bis dato größten MSC Yacht Club der Flotte, der Outdoor World Promenade und dem spektakulären Über-Kopf-Fahrgeschäft „Cliffhanger“.",
+            "MSC World Asia": "Zukunftsweisendes Design mit LED-Kuppel-Galerie, vielseitigen Spezialitätenrestaurants und atemberaubenden Panoramablicken aufs Meer.",
+            "MSC World Atlantic": "Beeindruckende Schiffsarchitektur mit bis zu 38.400 m² öffentlichen Bereichen, weitläufigen Wasserparks und exklusivem Yacht-Club-Areal.",
+            "MSC Euribia": "Umweltfreundlicher LNG-Antrieb mit ikonischer Indoor-Promenade unter dem längsten LED-Himmel auf See und riesigem Coral Reef Aquapark.",
+            "MSC Virtuosa": "Glamouröse Promenade mit der futuristischen „Robotic Bar“ (Roboter-Barkeeper Rob) und exklusiven Carousel Productions at Sea.",
+            "MSC Grandiosa": "Lebendige Indoor-Promenade mit spektakulärem LED-Himmel, exklusivem MSC Yacht Club und großem Sportplex-Komplex.",
+            "MSC Bellissima": "Ganzjähriger Komfort mit über 80 Meter langer Shopping-Promenade, Arizona Aquapark und der Carousel Lounge für Live-Entertainment.",
+            "MSC Meraviglia": "Das Pionierschiff der Klasse mit doppelstöckiger Indoor-Promenade, Polaris-Aquapark und großzügigem MSC Yacht Club.",
+            "MSC Seascape": "Spektakuläre Glasboden-Brücke „Bridge of Sighs“, weitläufiger Waterfront Boardwalk und interaktiver Flugsimulator ROBOTHON.",
+            "MSC Seashore": "Über 13.000 m² Außenfläche mit gläserner Laufbrücke über dem Heck-Pool, Infinity-Pools und maßgeschneiderten Piraten-Kinderbereichen.",
+            "MSC Seaview": "Dem Meer zugewandte Architektur mit 360°-Outdoor-Promenade, spektakulären Panorama-Aufzügen und zwei überlangen Ziplines.",
+            "MSC Seaside": "Innovatives Beach-Resort-Design für Sonnenseiten-Routen mit umlaufendem Promenadendeck, Glasbrücken und erfrischendem Aquapark.",
+            "MSC Preziosa": "Erstklassiger mediterraner Charme mit der preisgekrönten Vertigo-Wasserrutsche (mit Glaselement über dem Meer) und Allwetter-Magrodome-Pool.",
+            "MSC Divina": "Von Sophia Loren inspirierte Eleganz mit gläserner Swarovski-Treppe, Infinity-Aft-Pool und traumhaftem MSC Aurea Spa.",
+            "MSC Splendida": "Stilvolles Kreuzfahren mit dem Luxuskonzept des MSC Yacht Club, überdachtem Magrodome-Pooldeck und 4D-Kino.",
+            "MSC Fantasia": "Das Wiegenfest des exklusiven MSC Yacht Club Konzepts mit weitläufigen Außendecks, Top-Wellnessbereich und Formel-1-Simulator.",
+            "MSC Magnifica": "Hoher Anteil an Balkonkabinen kombiniert mit einem Allwetter-Pooldach, großzügigem Aurea Spa und bordeigenem Minigolfplatz.",
+            "MSC Poesia": "Zeitlose Eleganz mit atemberaubendem Wasserfall in der Foyer-Lounge, authentischem Zen-Garten und vielseitigem Sportzentrum.",
+            "MSC Orchestra": "Ausgewogene Kombination aus geräumigen Außenbereichen, exzellenter Kaffeebar und dem opulenten Covent Garden Theater.",
+            "MSC Musica": "Klassisches Schiffsdesign mit dreistufigem Wasserfall im Atrium, zahlreichen Balkonkabinen und erstklassigen Spezialitäten-Sushibars.",
+            "MSC Opera": "Wendiges Schiff mit Zugang zu kleineren Traumhäfen, Broadway-Theater und dem interaktiven Doremi Spray Park für Familien.",
+            "MSC Lirica": "Persönlicher Service und klassische Linienführung mit großem Panoramablick auf die See und erstklassigen Tanz-Lounges.",
+            "MSC Sinfonia": "Gemütliche Wohlfühlatmosphäre mit modernisiertem Kinder-Spielbereich in Kooperation mit LEGO® und Panorama-Fitnessstudio.",
+            "MSC Armonia": "Charmantes Reiseerlebnis mit flexiblem Routenzugang, großzügigen Außendecks und entspanntem Open-Air-Kinofeeling."
+        };
+
+        // Die Suche benötigt pro Termin nur die drei folgenden Angaben.
+        // Preis- und Verfügbarkeitsdaten werden deshalb nicht weitergeführt.
+        routesData.forEach(route => {
+            route.shipInfo = shipInfoByShip[route.schiff] || route.shipInfo;
+            route.departures = route.departures.map(({ start, end, label }) => ({ start, end, label }));
+        });
+
         document.addEventListener("DOMContentLoaded", () => {
    initChips();
    updateAvailableFilterOptions();
@@ -5393,6 +5500,10 @@
 
    const startDateInput = document.getElementById('startDate');
    const endDateInput = document.getElementById('endDate');
+   const todayISO = getTodayISO();
+
+   startDateInput.min = todayISO;
+   endDateInput.min = todayISO;
 
    function handleStartDateUpdate(e) {
        const startVal = e.target.value;
@@ -5404,7 +5515,7 @@
                endDateInput.value = startVal;
            }
        } else {
-           endDateInput.min = "2026-09-01";
+           endDateInput.min = todayISO;
        }
 
        updateAvailableFilterOptions();
@@ -5412,16 +5523,19 @@
    }
 
    startDateInput.addEventListener('change', handleStartDateUpdate);
-   startDateInput.addEventListener('input', handleStartDateUpdate);
 
    endDateInput.addEventListener('change', () => {
        updateAvailableFilterOptions();
        renderRoutes();
    });
-   endDateInput.addEventListener('input', () => {
-       updateAvailableFilterOptions();
-       renderRoutes();
-   });
+
+   document.getElementById('sortRoutes').addEventListener('change', () => renderRoutes());
+
+   const backToTop = document.getElementById('backToTop');
+   backToTop.addEventListener('click', () => window.scrollTo({ top:0, behavior:'smooth' }));
+   window.addEventListener('scroll', () => {
+       backToTop.classList.toggle('visible', window.scrollY > 500);
+   }, { passive:true });
 
    document.addEventListener('click', (e) => {
        if (!e.target.closest('.custom-multiselect')) {
@@ -5464,14 +5578,13 @@
             const availableRoutes = routesData.filter(route => {
                 if (selectedRegions.length > 0 && !selectedRegions.includes(route.region)) return false;
 
-                if (startVal) {
-                    const hasValidDeparture = route.departures.some(dep => {
-                        if (dep.start < startVal) return false;
-                        if (endVal && dep.end > endVal) return false;
-                        return true;
-                    });
-                    if (!hasValidDeparture) return false;
-                }
+                const hasValidDeparture = route.departures.some(dep => {
+                    if (!isUpcomingDeparture(dep)) return false;
+                    if (startVal && dep.start < startVal) return false;
+                    if (endVal && dep.end > endVal) return false;
+                    return true;
+                });
+                if (!hasValidDeparture) return false;
 
                 return true;
             });
@@ -5588,7 +5701,7 @@
             document.getElementById('startDate').value = '';
             document.getElementById('endDate').value = '';
 
-            document.getElementById('endDate').min = '2026-09-01';
+            document.getElementById('endDate').min = getTodayISO();
 
             document.getElementById('portFilterGroup').style.display = 'none';
 
@@ -5596,15 +5709,74 @@
             renderRoutes();
         }
 
-        function renderRoutes() {
+        function getValidDepartures(route, startVal, endVal) {
+            return route.departures.filter(dep => {
+                if (!isUpcomingDeparture(dep)) return false;
+                if (dep.start < startVal) return false;
+                if (endVal && dep.end > endVal) return false;
+                return true;
+            });
+        }
+
+        function getEarliestDepartureStart(route, startVal, endVal) {
+            return getValidDepartures(route, startVal, endVal)
+                .reduce((earliest, dep) => !earliest || dep.start < earliest ? dep.start : earliest, '');
+        }
+
+        function sortFilteredRoutes(routes, startVal, endVal) {
+            const sortBy = document.getElementById('sortRoutes').value;
+
+            return routes.sort((a, b) => {
+                if (sortBy === 'duration-asc') return a.nights - b.nights || a.title.localeCompare(b.title, 'de');
+                if (sortBy === 'duration-desc') return b.nights - a.nights || a.title.localeCompare(b.title, 'de');
+                if (sortBy === 'port') return a.startPort.localeCompare(b.startPort, 'de') || a.title.localeCompare(b.title, 'de');
+
+                return getEarliestDepartureStart(a, startVal, endVal).localeCompare(getEarliestDepartureStart(b, startVal, endVal)) || a.title.localeCompare(b.title, 'de');
+            });
+        }
+
+        function formatFilterDate(date) {
+            return new Intl.DateTimeFormat('de-DE', { day:'2-digit', month:'2-digit', year:'numeric' })
+                .format(new Date(`${date}T00:00:00`));
+        }
+
+        function updateResultsToolbar(count, show, startVal = '', endVal = '') {
+            const toolbar = document.getElementById('resultsToolbar');
+            toolbar.hidden = !show;
+            if (!show) return;
+
+            document.getElementById('resultCount').textContent = `${count} passende ${count === 1 ? 'Route' : 'Routen'}`;
+
+            const filters = [
+                ...selectedRegions,
+                ...selectedPorts,
+                ...selectedShips,
+                ...selectedDurations.map(value => allDurationsList.find(duration => duration.value === value)?.label || value),
+                startVal ? `Ab ${formatFilterDate(startVal)}` : '',
+                endVal ? `Bis ${formatFilterDate(endVal)}` : ''
+            ].filter(Boolean);
+
+            const activeFilters = document.getElementById('activeFilters');
+            activeFilters.replaceChildren(...filters.map(label => {
+                const chip = document.createElement('span');
+                chip.className = 'active-filter';
+                chip.textContent = label;
+                return chip;
+            }));
+        }
+
+        function renderRoutes(resetPagination = true) {
             const grid = document.getElementById('routeGrid');
             grid.innerHTML = '';
+
+            if (resetPagination) visibleRoutes = ROUTES_PER_PAGE;
 
             const startVal = document.getElementById('startDate').value;
             const endVal = document.getElementById('endDate').value;
 
             // Pflichtfilter prüfen: mindestens 1 Region UND mindestens Startdatum (Von)
             if (selectedRegions.length === 0 || !startVal) {
+                updateResultsToolbar(0, false);
                 grid.innerHTML = '<div class="no-results">Bitte wähle mindestens eine Region und das früheste Abreisedatum aus, um passende Routen angezeigt zu bekommen.</div>';
                 return;
             }
@@ -5629,32 +5801,30 @@
                 }
 
                 // Date Filter (Startdatum muss gewählt sein, Enddatum ist optional)
-                const hasValidDeparture = route.departures.some(dep => {
-                    if (dep.start < startVal) return false;
-                    if (endVal && dep.end > endVal) return false;
-                    return true;
-                });
-                if (!hasValidDeparture) return false;
+                if (getValidDepartures(route, startVal, endVal).length === 0) return false;
 
                 return true;
             });
 
             if (filtered.length === 0) {
+                updateResultsToolbar(0, false);
                 grid.innerHTML = '<div class="no-results">Keine passenden Kreuzfahrten gefunden. Bitte passe deine Suchfilter an.</div>';
                 return;
             }
 
-            filtered.forEach(route => {
+            sortFilteredRoutes(filtered, startVal, endVal);
+            updateResultsToolbar(filtered.length, true, startVal, endVal);
+
+            filtered.slice(0, visibleRoutes).forEach((route, index) => {
                 const card = document.createElement('div');
                 card.className = 'route-card';
 
                 let departuresHTML = '';
                
-                const validDeps = route.departures.filter(dep => {
-                    if (dep.start < startVal) return false;
-                    if (endVal && dep.end > endVal) return false;
-                    return true;
-                });
+                const validDeps = getValidDepartures(route, startVal, endVal)
+                    .sort((a, b) => a.start.localeCompare(b.start));
+                const imageLoading = index < 3 ? 'eager' : 'lazy';
+                const imagePriority = index === 0 ? 'high' : 'auto';
 
                 validDeps.forEach((dep, idx) => {
                     const isChecked = idx === 0 ? 'checked' : '';
@@ -5670,13 +5840,17 @@
                     <div class="card-header">
                         <h3>${route.title}</h3>
                     </div>
-                    <div class="image-container">
-                        <img src="${route.image}" alt="${route.title}">
+                    <div class="image-container is-loading">
+                        <img src="${route.image}" alt="${route.title}" width="640" height="400" loading="${imageLoading}" decoding="async" fetchpriority="${imagePriority}">
                     </div>
                     <div class="route-details-short">
-                        <div class="detail-row"><span class="detail-label">Schiff:</span><span class="detail-value">${route.schiff}</span></div>
-                        <div class="detail-row"><span class="detail-label">Hafen:</span><span class="detail-value">${route.startPort}</span></div>
-                        <div class="detail-row"><span class="detail-label">Dauer:</span><span class="detail-value">${route.nights} Nächte</span></div>
+                        <div class="detail-row"><span class="detail-label"><i class="fa-solid fa-ship" aria-hidden="true"></i> Schiff:</span><span class="detail-value">${route.schiff}</span></div>
+                        <div class="detail-row"><span class="detail-label"><i class="fa-solid fa-anchor" aria-hidden="true"></i> Hafen:</span><span class="detail-value">${route.startPort}</span></div>
+                        <div class="detail-row"><span class="detail-label"><i class="fa-regular fa-moon" aria-hidden="true"></i> Dauer:</span><span class="detail-value">${route.nights} Nächte</span></div>
+                        <div class="next-departure">
+                            <i class="fa-regular fa-calendar-check" aria-hidden="true"></i>
+                            <div><span class="next-departure-label">Nächste Abfahrt</span><span class="next-departure-date">${validDeps[0].label}</span></div>
+                        </div>
                        
                         <div class="dates-container">
                             <div class="dates-title">Verfügbare Termine:</div>
@@ -5707,13 +5881,57 @@
                     </div>
 
                     <div class="details-expanded" id="details_${route.id}">
-                        <p><strong>Über das Schiff:</strong> ${route.shipInfo}</p>
-                        <p><strong>Routenverlauf:</strong> ${route.fullRoute}</p>
+                        <section class="detail-section">
+                            <h4><i class="fa-solid fa-ship" aria-hidden="true"></i> Über das Schiff</h4>
+                            <p>${route.shipInfo}</p>
+                        </section>
+                        <section class="detail-section">
+                            <h4><i class="fa-solid fa-route" aria-hidden="true"></i> Routenverlauf</h4>
+                            <p>${route.fullRoute}</p>
+                        </section>
                     </div>
                 `;
 
+                const image = card.querySelector('.image-container img');
+                image.addEventListener('load', () => handleImageLoad(image), { once:true });
+                image.addEventListener('error', () => handleImageError(image), { once:true });
+                if (image.complete && image.naturalWidth > 0) handleImageLoad(image);
+
                 grid.appendChild(card);
             });
+
+            if (filtered.length > visibleRoutes) {
+                const loadMore = document.createElement('div');
+                loadMore.className = 'load-more';
+
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'btn btn-contact btn-load-more';
+                button.textContent = `Weitere Routen laden (${filtered.length - visibleRoutes})`;
+                button.addEventListener('click', loadMoreRoutes);
+
+                loadMore.appendChild(button);
+                grid.appendChild(loadMore);
+            }
+        }
+
+        function loadMoreRoutes() {
+            visibleRoutes += ROUTES_PER_PAGE;
+            renderRoutes(false);
+        }
+
+        function handleImageError(image) {
+            const container = image.closest('.image-container');
+            if (!container) return;
+
+            container.classList.remove('is-loading');
+            image.remove();
+            container.classList.add('image-unavailable');
+            container.setAttribute('aria-label', 'Bild derzeit nicht verfügbar');
+        }
+
+        function handleImageLoad(image) {
+            image.closest('.image-container')?.classList.remove('is-loading');
         }
 
         function toggleContact(id) {
