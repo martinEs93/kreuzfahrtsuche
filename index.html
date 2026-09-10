@@ -136,6 +136,10 @@
 
         .results-toolbar { display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0 0 18px; padding:14px 16px; border:1px solid var(--border); border-radius:12px; background:#fff; box-shadow:0 3px 12px rgba(10,26,47,0.04); }
         .results-toolbar[hidden] { display:none; }
+        .chat-search-notice { display:flex; align-items:flex-start; gap:10px; margin:-6px 0 18px; padding:12px 14px; border:1px solid #cfe0f2; border-radius:10px; color:#173b60; background:#edf5fc; font-size:14px; font-weight:600; }
+        .chat-search-notice[hidden] { display:none; }
+        .chat-search-notice--similar { border-color:#f2d89a; color:#6b4b08; background:#fff8e6; }
+        .chat-search-notice i { margin-top:3px; }
         .results-summary { min-width:0; }
         .result-count { margin:0; color:var(--primary); font-weight:700; }
         .btn-show-all-routes { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:9px 13px; color:var(--primary); background:#fff; border:1px solid rgba(0, 51, 102, .24); border-radius:8px; cursor:pointer; font:inherit; font-size:13px; font-weight:700; }
@@ -308,13 +312,6 @@
         .smart-chat__avatar { flex:0 0 auto; width:29px; height:29px; border-radius:50%; object-fit:cover; background:#e8f0f7; }
         .smart-chat__bubble { max-width:calc(100% - 38px); margin:0; padding:10px 12px; border-radius:5px 13px 13px; color:#173b60; background:#eaf3fb; font-size:14px; font-weight:600; line-height:1.42; white-space:pre-line; }
         .smart-chat__message--user .smart-chat__bubble { border-radius:13px 5px 13px 13px; color:#fff; background:#003366; }
-        .smart-chat__results { display:grid; gap:7px; padding:0 16px 10px; background:#f8fafc; }
-        .smart-chat__results[hidden] { display:none; }
-        .smart-chat__result { padding:10px; border:1px solid #cfe0f2; border-radius:9px; background:#fff; }
-        .smart-chat__result-title { display:block; color:#003366; font-size:13px; font-weight:800; line-height:1.3; }
-        .smart-chat__result-meta { display:block; margin-top:3px; color:#526a7e; font-size:11px; line-height:1.35; }
-        .smart-chat__result-button { width:100%; margin-top:8px; padding:7px 9px; border:1px solid #003366; border-radius:6px; color:#003366; background:#fff; cursor:pointer; font:inherit; font-size:11px; font-weight:800; }
-        .smart-chat__result-button:hover { color:#fff; background:#003366; }
         .smart-chat__suggestion { padding:8px 16px 13px; background:#f8fafc; }
         .smart-chat__suggestion-label { display:block; margin:0 0 7px; color:#64748b; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; }
         .smart-chat__actions { display:flex; flex-wrap:wrap; gap:7px; }
@@ -454,6 +451,7 @@
                     </select>
                 </label>
             </div>
+            <div class="chat-search-notice" id="chatSearchNotice" hidden role="status"></div>
 
             <div class="route-grid" id="routeGrid"></div>
         </div>
@@ -492,7 +490,6 @@
                     <p class="smart-chat__bubble">Brauchst du Unterstützung bei der Wahl deiner Route?</p>
                 </div>
             </div>
-            <div class="smart-chat__results" id="smartChatResults" hidden aria-label="Passende Routen"></div>
             <div class="smart-chat__suggestion" id="smartChatSuggestion">
                 <span class="smart-chat__suggestion-label">Wähle, wobei ich helfen darf</span>
                 <div class="smart-chat__actions" id="smartChatActions"></div>
@@ -5694,6 +5691,12 @@
 
         function startNewSearch() {
             showingFavorites = false;
+            const notice = document.getElementById('chatSearchNotice');
+            if (notice) {
+                notice.hidden = true;
+                notice.replaceChildren();
+                notice.classList.remove('chat-search-notice--similar');
+            }
         }
 
         document.addEventListener("DOMContentLoaded", () => {
@@ -6351,7 +6354,6 @@ endDateInput.addEventListener('change', handleDateUpdate);
             const toggle = document.getElementById('consultationChatToggle');
             const close = document.getElementById('consultationChatClose');
             const messages = document.getElementById('smartChatMessages');
-            const results = document.getElementById('smartChatResults');
             const actions = document.getElementById('smartChatActions');
             const suggestion = document.getElementById('smartChatSuggestion');
             const suggestionLabel = suggestion?.querySelector('.smart-chat__suggestion-label');
@@ -6360,7 +6362,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
             const restart = document.getElementById('smartChatRestart');
             const whatsapp = document.getElementById('consultationChatWhatsApp');
             const mail = document.getElementById('consultationChatMail');
-            if (!chat || !toggle || !close || !messages || !results || !actions || !suggestion || !suggestionLabel || !form || !input || !restart || !whatsapp || !mail) return;
+            if (!chat || !toggle || !close || !messages || !actions || !suggestion || !suggestionLabel || !form || !input || !restart || !whatsapp || !mail) return;
 
             let submitTextAnswer = null;
             let advisorState = {};
@@ -6450,25 +6452,65 @@ endDateInput.addEventListener('change', handleDateUpdate);
                     .replace(/ß/g, 'ss');
             }
 
+            function getEditDistance(a, b) {
+                const rows = Array.from({ length:b.length + 1 }, (_, index) => index);
+                for (let i = 1; i <= a.length; i++) {
+                    let previous = rows[0];
+                    rows[0] = i;
+                    for (let j = 1; j <= b.length; j++) {
+                        const current = rows[j];
+                        rows[j] = Math.min(rows[j] + 1, rows[j - 1] + 1, previous + (a[i - 1] === b[j - 1] ? 0 : 1));
+                        previous = current;
+                    }
+                }
+                return rows[b.length];
+            }
+
+            function matchesChatTerm(normalizedQuery, queryWords, term) {
+                const normalizedTerm = normalizeChatQuery(term);
+                if (normalizedQuery.includes(normalizedTerm)) return { matched:true, fuzzy:false };
+                if (normalizedTerm.length < 4) return { matched:false, fuzzy:false };
+                const fuzzyWord = queryWords.find(word => word.length >= 4 && getEditDistance(word, normalizedTerm) <= 2);
+                return { matched:Boolean(fuzzyWord), fuzzy:Boolean(fuzzyWord) };
+            }
+
             function parseRouteRequest(query) {
                 const normalized = normalizeChatQuery(query);
+                const queryWords = normalized.match(/[a-z0-9]+/g) || [];
                 const regionAliases = [
-                    { region:'Karibik & Antillen', terms:['karibik', 'antillen'] },
-                    { region:'Mittelmeer', terms:['mittelmeer', 'mediterran'] },
-                    { region:'Nordeuropa', terms:['nordeuropa', 'norwegen', 'fjord', 'ostsee'] },
-                    { region:'Kanarische Inseln und Madeira', terms:['kanaren', 'madeira'] },
+                    { region:'Karibik & Antillen', terms:['karibik', 'antillen', 'bahamas', 'jamaika'] },
+                    { region:'Mittelmeer', terms:['mittelmeer', 'mediterran', 'italien', 'griechenland', 'spanien'] },
+                    { region:'Nordeuropa', terms:['nordeuropa', 'norwegen', 'fjord', 'ostsee', 'baltikum'] },
+                    { region:'Kanarische Inseln und Madeira', terms:['kanaren', 'madeira', 'teneriffa'] },
                     { region:'Alaska', terms:['alaska'] },
-                    { region:'Südamerika', terms:['sudamerika', 'suedamerika'] },
-                    { region:'Asien', terms:['asien', 'japan'] },
-                    { region:'Südafrika', terms:['sudafrika', 'suedafrika'] }
+                    { region:'Südamerika', terms:['sudamerika', 'suedamerika', 'brasilien'] },
+                    { region:'Asien', terms:['asien', 'japan', 'tokio'] },
+                    { region:'Südafrika', terms:['sudafrika', 'suedafrika'] },
+                    { regions:['World Cruise', 'MSC Grand Voyages'], label:'Weltreise & lange Reisen', terms:['world cruise', 'weltreise', 'welt reise', 'einmal um die welt', 'rund um die welt'] },
+                    { region:'MSC Grand Voyages', terms:['grand voyage', 'grand voyages'] }
                 ];
-                const match = regionAliases.find(entry => entry.terms.some(term => normalized.includes(term)));
+                const regionMatches = regionAliases.map(entry => ({
+                    entry,
+                    terms:entry.terms.map(term => matchesChatTerm(normalized, queryWords, term))
+                })).filter(result => result.terms.some(term => term.matched));
+                const regions = [...new Set(regionMatches.flatMap(({ entry }) => entry.regions || [entry.region]))];
+                const regionLabel = regionMatches.length === 1 ? (regionMatches[0].entry.label || regionMatches[0].entry.region) : '';
+                const usedFuzzyMatch = regionMatches.some(result => result.terms.some(term => term.fuzzy));
                 const ships = [...new Set(routesData.map(route => route.schiff))];
-                const ship = ships.find(name => {
+                let ship = ships.find(name => {
                     const normalizedName = normalizeChatQuery(name);
                     const withoutMsc = normalizedName.replace(/^msc\s+/, '');
                     return normalized.includes(normalizedName) || (withoutMsc.length > 4 && normalized.includes(withoutMsc));
                 });
+                let usedFuzzyShipMatch = false;
+                if (!ship) {
+                    ship = ships.find(name => {
+                        const shipWords = normalizeChatQuery(name).replace(/^msc\s+/, '').match(/[a-z0-9]+/g) || [];
+                        const matchedWords = shipWords.filter(shipWord => queryWords.some(queryWord => getEditDistance(queryWord, shipWord) <= 2));
+                        return matchedWords.length >= Math.min(2, shipWords.length);
+                    });
+                    usedFuzzyShipMatch = Boolean(ship);
+                }
                 const months = {
                     januar:1, jan:1, februar:2, feb:2, maerz:3, marz:3, märz:3,
                     april:4, apr:4, mai:5, juni:6, jun:6, juli:7, jul:7, august:8, aug:8,
@@ -6484,22 +6526,28 @@ endDateInput.addEventListener('change', handleDateUpdate);
                     startDate = `${year}-${String(month).padStart(2, '0')}-01`;
                     endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
                 }
-                return { region:match?.region || '', ship:ship || '', startDate, endDate, original:query };
+                return {
+                    region:regions.length === 1 ? regions[0] : '',
+                    regions,
+                    regionLabel,
+                    ship:ship || '',
+                    startDate,
+                    endDate,
+                    original:query,
+                    usedFuzzyMatch:usedFuzzyMatch || usedFuzzyShipMatch
+                };
             }
 
             function getMatchingChatRoutes(criteria) {
                 return routesData
                     .map(route => ({
                         route,
-                        departures:route.departures.filter(dep => {
-                            if (!isUpcomingDeparture(dep)) return false;
-                            if (criteria.startDate && dep.start < criteria.startDate) return false;
-                            if (criteria.endDate && dep.start > criteria.endDate) return false;
-                            return true;
-                        })
+                        // Dieselbe Datumslogik wie die sichtbare Routensuche verwenden,
+                        // damit der Chat niemals Treffer verspricht, die die Seite nicht zeigen kann.
+                        departures:getValidDepartures(route, criteria.startDate || getTodayISO(), criteria.endDate)
                     }))
                     .filter(({ route, departures }) =>
-                        (!criteria.region || route.region === criteria.region) &&
+                        (!(criteria.regions?.length || criteria.region) || (criteria.regions?.length ? criteria.regions.includes(route.region) : route.region === criteria.region)) &&
                         (!criteria.ship || route.schiff === criteria.ship) &&
                         departures.length > 0
                     )
@@ -6508,19 +6556,28 @@ endDateInput.addEventListener('change', handleDateUpdate);
 
             function describeChatCriteria(criteria) {
                 const parts = [];
-                if (criteria.region) parts.push(criteria.region);
+                if (criteria.regionLabel) parts.push(criteria.regionLabel);
+                else if (criteria.regions?.length) parts.push(criteria.regions.join(' oder '));
+                else if (criteria.region) parts.push(criteria.region);
                 if (criteria.ship) parts.push(criteria.ship);
                 if (criteria.startDate) parts.push(new Intl.DateTimeFormat('de-DE', { month:'long', year:'numeric' }).format(new Date(`${criteria.startDate}T00:00:00`)));
                 return parts.join(' · ');
             }
 
             function applyChatCriteriaToPage(criteria) {
-                selectedRegions = criteria.region ? [criteria.region] : selectedRegions;
-                selectedShips = criteria.ship ? [criteria.ship] : selectedShips;
+                // Eine zuvor geöffnete Einzelroute bzw. Favoritenansicht darf die Chat-Suche nicht überdecken.
+                showingFavorites = false;
+                const url = new URL(window.location.href);
+                if (url.searchParams.has('route')) {
+                    url.searchParams.delete('route');
+                    window.history.replaceState({}, '', url.toString());
+                }
+                selectedRegions = criteria.regions?.length ? criteria.regions : (criteria.region ? [criteria.region] : []);
+                selectedShips = criteria.ship ? [criteria.ship] : [];
                 selectedPorts = [];
                 selectedDurations = [];
-                if (criteria.startDate) document.getElementById('startDate').value = criteria.startDate;
-                if (criteria.endDate) document.getElementById('endDate').value = criteria.endDate;
+                document.getElementById('startDate').value = criteria.startDate || getTodayISO();
+                document.getElementById('endDate').value = criteria.endDate || '';
                 document.querySelectorAll('#regionChips .chip').forEach(chip => {
                     chip.classList.toggle('active', selectedRegions.includes(chip.dataset.value));
                 });
@@ -6529,56 +6586,100 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 renderRoutes();
             }
 
-            function renderChatResults(criteria) {
-                const matches = getMatchingChatRoutes(criteria);
-                results.replaceChildren();
-                results.hidden = false;
-                matches.slice(0, 3).forEach(({ route, departures }) => {
-                    const card = document.createElement('article');
-                    card.className = 'smart-chat__result';
-                    const title = document.createElement('strong');
-                    title.className = 'smart-chat__result-title';
-                    title.textContent = route.title;
-                    const meta = document.createElement('span');
-                    meta.className = 'smart-chat__result-meta';
-                    meta.textContent = `${route.schiff} · ab ${route.startPort} · ${route.nights} Nächte · nächste passende Abfahrt: ${departures[0].label}`;
-                    const button = document.createElement('button');
-                    button.type = 'button';
-                    button.className = 'smart-chat__result-button';
-                    button.textContent = 'Route auf der Seite anzeigen';
-                    button.addEventListener('click', () => {
-                        advisorState.focusRoute = route;
-                        const url = new URL(window.location.href);
-                        url.search = '';
-                        url.searchParams.set('route', route.id);
-                        window.location.href = url.toString();
+            function getCriteriaRegions(criteria) {
+                return criteria.regions?.length ? criteria.regions : (criteria.region ? [criteria.region] : []);
+            }
+
+            function addResultRegions(criteria, matches) {
+                if (getCriteriaRegions(criteria).length) return criteria;
+                const resultRegions = [...new Set(matches.map(({ route }) => route.region))];
+                return { ...criteria, regions:resultRegions, region:'', regionLabel:'' };
+            }
+
+            function findSimilarChatResults(criteria) {
+                const alternatives = [];
+                const hasRegions = getCriteriaRegions(criteria).length > 0;
+                if (criteria.ship) {
+                    alternatives.push({
+                        criteria:{ ...criteria, ship:'' },
+                        reason:'Das gewünschte Schiff ist im gewählten Zeitraum oder Ziel nicht verfügbar. Deshalb zeigen wir dir ähnliche Routen ohne genaue Schiffsvorgabe.'
                     });
-                    card.append(title, meta, button);
-                    results.appendChild(card);
+                }
+                if (criteria.startDate || criteria.endDate) {
+                    alternatives.push({
+                        criteria:{ ...criteria, startDate:'', endDate:'' },
+                        reason:'Für deinen gewünschten Zeitraum gibt es keine exakte Route. Deshalb zeigen wir dir ähnliche Routen zu deinem Ziel mit anderen Abfahrtsdaten.'
+                    });
+                }
+                if (hasRegions) {
+                    alternatives.push({
+                        criteria:{ ...criteria, region:'', regions:[], regionLabel:'' },
+                        reason:'Für das gewünschte Ziel gibt es keine exakte Route. Deshalb zeigen wir dir ähnliche verfügbare Routen.'
+                    });
+                }
+                alternatives.push({
+                    criteria:{ region:'', regions:[], regionLabel:'', ship:'', startDate:'', endDate:'' },
+                    reason:'Wir zeigen dir ähnliche verfügbare Routen, die als Ausgangspunkt für deine persönliche Beratung dienen können.'
                 });
-                return matches;
+
+                for (const alternative of alternatives) {
+                    const matches = getMatchingChatRoutes(alternative.criteria);
+                    if (matches.length) return { ...alternative, matches };
+                }
+                return null;
+            }
+
+            function showChatSearchNotice(message, isSimilar = false) {
+                const notice = document.getElementById('chatSearchNotice');
+                if (!notice) return;
+                notice.replaceChildren();
+                const icon = document.createElement('i');
+                icon.className = isSimilar ? 'fa-solid fa-lightbulb' : 'fa-solid fa-magnifying-glass';
+                icon.setAttribute('aria-hidden', 'true');
+                const text = document.createElement('span');
+                text.textContent = message;
+                notice.append(icon, text);
+                notice.classList.toggle('chat-search-notice--similar', isSimilar);
+                notice.hidden = false;
+            }
+
+            function focusRouteResults() {
+                const target = document.getElementById('resultsToolbar') || document.getElementById('routeGrid');
+                if (!target) return;
+                window.requestAnimationFrame(() => {
+                    target.scrollIntoView({ behavior:'smooth', block:'start' });
+                });
             }
 
             function showChatSearch(criteria) {
-                const matches = renderChatResults(criteria);
+                const exactMatches = getMatchingChatRoutes(criteria);
                 advisorState.criteria = criteria;
                 const description = describeChatCriteria(criteria);
-                if (matches.length) {
-                    applyChatCriteriaToPage(criteria);
-                    addMessage(`Ich habe ${matches.length} passende ${matches.length === 1 ? 'Route' : 'Routen'}${description ? ` für ${description}` : ''} gefunden. Die ersten drei siehst du direkt hier.`);
-                    const shipChoices = [...new Set(matches.map(({ route }) => route.schiff))].slice(0, 2);
-                    setActions('Möchtest du weiter eingrenzen?', [
-                        ...shipChoices.map(ship => ({ label:ship, run:() => showChatSearch({ ...criteria, ship }) })),
-                        { label:'Freitext verfeinern', run:askForRouteQuery },
-                        { label:'Beratung zu diesen Routen', run:() => finishWithContact('Wir beraten dich gern zu diesen passenden Routen und prüfen die besten Termine.') }
-                    ]);
+                if (exactMatches.length) {
+                    const displayCriteria = addResultRegions(criteria, exactMatches);
+                    applyChatCriteriaToPage(displayCriteria);
+                    const fuzzyHint = criteria.usedFuzzyMatch ? ' Ich habe Tippfehler berücksichtigt.' : '';
+                    showChatSearchNotice(`Chat-Suche: ${exactMatches.length} passende ${exactMatches.length === 1 ? 'Route' : 'Routen'}${description ? ` für ${description}` : ''}.${fuzzyHint}`);
+                    addMessage(`Ich habe ${exactMatches.length} passende ${exactMatches.length === 1 ? 'Route' : 'Routen'}${description ? ` für ${description}` : ''} gefunden.${fuzzyHint} Ich zeige sie dir jetzt direkt in der Kreuzfahrtsuche.`);
+                    setOpen(false);
+                    focusRouteResults();
                 } else {
-                    addMessage(`Für${description ? ` ${description}` : ' diese Suche'} finde ich aktuell keine exakte Route. Unser Team kann gern Alternativen oder weitere Termine prüfen.`);
-                    setActions('Wie möchtest du weitergehen?', [
-                        { label:'Suche anders formulieren', run:askForRouteQuery },
-                        { label:'Persönliche Alternativen anfragen', run:() => finishWithContact('Wir suchen gern persönlich nach einer passenden Alternative.') },
-                        { label:'Neue Suche starten', run:startRouteFinder }
-                    ]);
+                    const similar = findSimilarChatResults(criteria);
+                    if (similar) {
+                        const displayCriteria = addResultRegions(similar.criteria, similar.matches);
+                        applyChatCriteriaToPage(displayCriteria);
+                        showChatSearchNotice(`Ähnliche Routen: ${similar.reason}`, true);
+                        addMessage(`Ich finde keine exakte Route${description ? ` für ${description}` : ''}. ${similar.reason} Die ähnlichen Routen zeige ich dir jetzt in der Kreuzfahrtsuche.`);
+                        setOpen(false);
+                        focusRouteResults();
+                    } else {
+                        addMessage(`Für${description ? ` ${description}` : ' diese Suche'} finde ich aktuell weder exakte noch ähnliche Routen. Unser Team kann gern weitere Termine oder Alternativen prüfen.`);
+                        setActions('Wie möchtest du weitergehen?', [
+                            { label:'Suche anders formulieren', run:askForRouteQuery },
+                            { label:'Persönliche Alternativen anfragen', run:() => finishWithContact('Wir suchen gern persönlich nach einer passenden Alternative.') },
+                            { label:'Neue Suche starten', run:startRouteFinder }
+                        ]);
+                    }
                 }
             }
 
@@ -6662,15 +6763,14 @@ endDateInput.addEventListener('change', handleDateUpdate);
 
             function startRouteFinder() {
                 advisorState.goal = 'Ich möchte eine passende Kreuzfahrtroute finden';
-                results.hidden = true;
-                results.replaceChildren();
-                addMessage('Ich kann dir direkt passende Routen zeigen. Wähle ein Reiseziel oder schreib deinen Wunsch frei hinein.');
-                setActions('Wohin soll die Reise gehen?', [
-                    { label: 'Karibik', run: () => showChatSearch({ region:'Karibik & Antillen', ship:'', startDate:'', endDate:'' }) },
-                    { label: 'Mittelmeer', run: () => showChatSearch({ region:'Mittelmeer', ship:'', startDate:'', endDate:'' }) },
-                    { label: 'Nordeuropa', run: () => showChatSearch({ region:'Nordeuropa', ship:'', startDate:'', endDate:'' }) },
-                    { label: 'Freitext oder anderes Ziel', run: askForRouteQuery },
-                    { label: 'Ich möchte mich beraten lassen', run: askForRoutePriority }
+                addMessage('Ich suche jetzt direkt in unserer Kreuzfahrtsuche für dich. Wähle ein Ziel oder gib deinen Wunsch als Freitext ein – die passenden Routen erscheinen anschließend auf der Seite.');
+                setActions('Route suchen', [
+                    { label: 'Karibik anzeigen', run: () => showChatSearch({ region:'Karibik & Antillen', ship:'', startDate:'', endDate:'' }) },
+                    { label: 'Mittelmeer anzeigen', run: () => showChatSearch({ region:'Mittelmeer', ship:'', startDate:'', endDate:'' }) },
+                    { label: 'Nordeuropa anzeigen', run: () => showChatSearch({ region:'Nordeuropa', ship:'', startDate:'', endDate:'' }) },
+                    { label: 'Weltreise anzeigen', run: () => showChatSearch({ regions:['World Cruise', 'MSC Grand Voyages'], regionLabel:'Weltreise & lange Reisen', ship:'', startDate:'', endDate:'' }) },
+                    { label: 'Freitext-Suche starten', run: askForRouteQuery },
+                    { label: 'Lieber persönlich beraten', run: askForRoutePriority }
                 ]);
             }
 
@@ -6724,8 +6824,6 @@ endDateInput.addEventListener('change', handleDateUpdate);
             function startConversation() {
                 advisorState = {};
                 messages.replaceChildren();
-                results.replaceChildren();
-                results.hidden = true;
                 const sharedRoute = getSharedRoute();
                 if (sharedRoute) {
                     advisorState.focusRoute = sharedRoute;
@@ -6736,9 +6834,9 @@ endDateInput.addEventListener('change', handleDateUpdate);
                         { label: 'Meine Favoriten ansehen', run: checkFavorites }
                     ]);
                 } else {
-                    addMessage('Hallo, ich bin dein digitaler Reiseassistent von Core Cruises. Ich helfe dir, Routen einzuordnen und die richtige Anfrage für unser Beratungsteam vorzubereiten.');
+                    addMessage('Hallo, ich bin dein digitaler Reiseassistent von Core Cruises. Ich kann dir passende Routen direkt in der Suche anzeigen oder deine Anfrage für unser Beratungsteam vorbereiten.');
                     setActions('Wobei darf ich helfen?', [
-                        { label: 'Passende Route finden', run: startRouteFinder },
+                        { label: 'Routen direkt suchen', run: startRouteFinder },
                         { label: 'Meine Favoriten prüfen', run: checkFavorites },
                         { label: 'Aktuelle Suche beraten', run: adviseCurrentSearch },
                         { label: 'Rückruf anfragen', run: requestCallback }
