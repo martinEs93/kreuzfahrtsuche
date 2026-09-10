@@ -5536,6 +5536,20 @@
             }
         }
 
+        function pruneFavoriteRoutes() {
+            const routeIds = new Set(routesData.map(route => route.id));
+            let changed = false;
+
+            favoriteRouteIds.forEach(id => {
+                if (!routeIds.has(id)) {
+                    favoriteRouteIds.delete(id);
+                    changed = true;
+                }
+            });
+
+            if (changed) saveFavorites();
+        }
+
         function updateFavoritesToggle() {
             const button = document.getElementById('favoritesToggle');
             if (!button) return;
@@ -5847,6 +5861,9 @@ endDateInput.addEventListener('change', handleDateUpdate);
         }
 
         function renderRoutes(resetPagination = true) {
+            // Entfernte Routen bleiben nicht als Favorit zurück.
+            pruneFavoriteRoutes();
+
             const grid = document.getElementById('routeGrid');
             grid.innerHTML = '';
             const sharedRouteId = Number(new URLSearchParams(window.location.search).get('route'));
