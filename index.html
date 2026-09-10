@@ -557,6 +557,9 @@
         let selectedPorts = [];
         let selectedShips = [];
         let selectedDurations = [];
+        // Exakte Dauern können im Chat genannt werden, während die sichtbare
+        // Auswahl weiterhin mit den vier vertrauten Dauerbereichen arbeitet.
+        let chatExactNights = null;
         const ROUTES_PER_PAGE = 12;
         let visibleRoutes = ROUTES_PER_PAGE;
         const FAVORITES_STORAGE_KEY = 'corecruises-route-favorites';
@@ -2347,9 +2350,9 @@
     { start: "2028-06-30", end: "2028-07-11", label: "Fr. 30 Juni - Di. 11 Juli 2028" }
   ]
 },
-{
-  id: 51,
-  title: "7 Nächte Südamerika ab Santos",
+  {
+   id: 183,
+   title: "7 Nächte Südamerika ab Santos",
   schiff: "MSC Meraviglia",
   region: "Südamerika",
   nights: 7,
@@ -5679,6 +5682,13 @@
             renderRoutes(false);
         }
 
+        // Einige ältere Datensätze verwenden eine ausgeschriebene Variante. Die
+        // Oberfläche und der Concierge arbeiten bewusst mit einem kanonischen
+        // Regionswert, damit keine Reise durch eine Schreibvariante verschwindet.
+        routesData.forEach(route => {
+            if (route.region === 'Karibik und Antillen') route.region = 'Karibik & Antillen';
+        });
+
         function toggleFavoritesView() {
             showingFavorites = !showingFavorites;
 
@@ -5694,6 +5704,9 @@
 
         function startNewSearch() {
             showingFavorites = false;
+            // Eine manuelle Änderung der Seite löst eine zuvor vom Chat gesetzte
+            // exakte Dauer auf, damit die sichtbaren Filter immer eindeutig sind.
+            chatExactNights = null;
             const notice = document.getElementById('chatSearchNotice');
             if (notice) {
                 notice.hidden = true;
@@ -5864,10 +5877,14 @@ endDateInput.addEventListener('change', handleDateUpdate);
             group.style.display = 'block';
             portDrop.innerHTML = '';
 
-            const availablePortsInRoutes = routesData.map(r => r.startPort);
-
             selectedRegions.forEach(reg => {
-                const ports = (regionPortsData[reg] || []).filter(p => availablePortsInRoutes.includes(p));
+                // Die Hafenauswahl wird aus den tatsächlichen Routendaten erzeugt.
+                // So bleiben auch Häfen mit abweichender Schreibweise oder neu
+                // hinzugekommene Häfen im Filter und im Concierge verfügbar.
+                const ports = [...new Set(routesData
+                    .filter(route => route.region === reg)
+                    .map(route => route.startPort))]
+                    .sort((a, b) => a.localeCompare(b, 'de'));
                 if (ports.length > 0) {
                     const header = document.createElement('div');
                     header.className = 'dropdown-group-header';
@@ -5970,7 +5987,9 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 ...selectedRegions,
                 ...selectedPorts,
                 ...selectedShips,
-                ...selectedDurations.map(value => allDurationsList.find(duration => duration.value === value)?.label || value),
+                ...(chatExactNights !== null
+                    ? [String(chatExactNights) + ' Nächte']
+                    : selectedDurations.map(value => allDurationsList.find(duration => duration.value === value)?.label || value)),
                 startVal ? `Ab ${formatFilterDate(startVal)}` : '',
                 endVal ? `Bis ${formatFilterDate(endVal)}` : ''
             ].filter(Boolean);
@@ -6032,6 +6051,10 @@ endDateInput.addEventListener('change', handleDateUpdate);
                     });
                     if (!match) return false;
                 }
+
+                // Der Concierge darf einen expliziten Wunsch wie „7 Nächte“
+                // nicht unbemerkt auf den UI-Bereich „6–7 Nächte“ verbreitern.
+                if (chatExactNights !== null && route.nights !== chatExactNights) return false;
 
                 // Date Filter (Startdatum muss gewählt sein, Enddatum ist optional)
                 if (getValidDepartures(route, startVal, endVal).length === 0) return false;
@@ -6351,7 +6374,8 @@ endDateInput.addEventListener('change', handleDateUpdate);
             window.location.href = mailtoUrl;
         }
 
-        // Dialoggesteuerter Beratungs-Concierge für persönliche, manuelle Buchungen.
+        // Kontextsensitiver Beratungs-Concierge. Alle Fragen und Treffer werden
+        // aus derselben Filterbasis wie die Routensuche abgeleitet.
         (function initSmartConsultationChat() {
             const chat = document.getElementById('consultationChat');
             const toggle = document.getElementById('consultationChatToggle');
@@ -6370,6 +6394,25 @@ endDateInput.addEventListener('change', handleDateUpdate);
             let submitTextAnswer = null;
             let advisorState = {};
 
+            const MONTHS = {
+                januar:1, jan:1, februar:2, feb:2, marz:3, märz:3, maerz:3,
+                april:4, apr:4, mai:5, juni:6, jun:6, juli:7, jul:7, august:8, aug:8,
+                september:9, sep:9, oktober:10, okt:10, november:11, nov:11, dezember:12, dez:12
+            };
+
+            const REGION_ENTITIES = [
+                { regions:['Karibik & Antillen'], label:'Karibik & Antillen', aliases:['karibik', 'antillen', 'bahamas', 'jamaika'] },
+                { regions:['Mittelmeer'], label:'Mittelmeer', aliases:['mittelmeer', 'mediterran', 'italien', 'griechenland', 'spanien'] },
+                { regions:['Nordeuropa'], label:'Nordeuropa', aliases:['nordeuropa', 'norwegen', 'fjord', 'fjorde', 'ostsee', 'baltikum'] },
+                { regions:['Kanarische Inseln und Madeira'], label:'Kanarische Inseln und Madeira', aliases:['kanaren', 'madeira', 'teneriffa', 'gran canaria'] },
+                { regions:['Alaska'], label:'Alaska', aliases:['alaska'] },
+                { regions:['Südamerika'], label:'Südamerika', aliases:['sudamerika', 'suedamerika', 'brasilien'] },
+                { regions:['Asien'], label:'Asien', aliases:['asien', 'japan', 'tokio'] },
+                { regions:['Südafrika'], label:'Südafrika', aliases:['sudafrika', 'suedafrika'] },
+                { regions:['World Cruise', 'MSC Grand Voyages'], label:'Weltreise & lange Reisen', aliases:['world cruise', 'weltreise', 'welt reise', 'einmal um die welt', 'rund um die welt'] },
+                { regions:['MSC Grand Voyages'], label:'MSC Grand Voyages', aliases:['grand voyage', 'grand voyages'] }
+            ];
+
             function setOpen(isOpen) {
                 chat.classList.toggle('is-open', isOpen);
                 toggle.setAttribute('aria-expanded', String(isOpen));
@@ -6377,7 +6420,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
 
             function addMessage(text, fromUser = false) {
                 const row = document.createElement('div');
-                row.className = `smart-chat__message${fromUser ? ' smart-chat__message--user' : ''}`;
+                row.className = 'smart-chat__message' + (fromUser ? ' smart-chat__message--user' : '');
                 if (!fromUser) {
                     const avatar = document.createElement('img');
                     avatar.className = 'smart-chat__avatar';
@@ -6422,37 +6465,41 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 submitTextAnswer = onAnswer;
             }
 
-            function getFilterSummary() {
-                const parts = [];
-                if (selectedRegions.length) parts.push(`Region: ${selectedRegions.join(', ')}`);
-                if (selectedPorts.length) parts.push(`Abfahrtshafen: ${selectedPorts.join(', ')}`);
-                if (selectedShips.length) parts.push(`Schiff: ${selectedShips.join(', ')}`);
-                if (selectedDurations.length) {
-                    const durations = selectedDurations.map(value => allDurationsList.find(duration => duration.value === value)?.label || value);
-                    parts.push(`Reisedauer: ${durations.join(', ')}`);
-                }
-                const start = document.getElementById('startDate')?.value;
-                const end = document.getElementById('endDate')?.value;
-                if (start) parts.push(`früheste Abreise: ${formatFilterDate(start)}`);
-                if (end) parts.push(`späteste Abreise: ${formatFilterDate(end)}`);
-                return parts;
+            function unique(values) {
+                return [...new Set((values || []).filter(Boolean))];
             }
 
-            function getFavoriteRoutes() {
-                return routesData.filter(route => favoriteRouteIds.has(route.id));
+            function joinNaturally(values, conjunction = 'oder') {
+                const items = unique(values);
+                if (!items.length) return '';
+                if (items.length === 1) return items[0];
+                if (items.length === 2) return items[0] + ' ' + conjunction + ' ' + items[1];
+                return items.slice(0, -1).join(', ') + ' ' + conjunction + ' ' + items[items.length - 1];
             }
 
-            function getSharedRoute() {
-                const id = Number(new URLSearchParams(window.location.search).get('route'));
-                return Number.isInteger(id) && id > 0 ? routesData.find(route => route.id === id) : null;
-            }
-
-            function normalizeChatQuery(value = '') {
-                return value
+            function normalizeRaw(value = '') {
+                return String(value)
                     .toLocaleLowerCase('de-DE')
                     .normalize('NFD')
                     .replace(/[\u0300-\u036f]/g, '')
                     .replace(/ß/g, 'ss');
+            }
+
+            function normalizeChatText(value = '') {
+                return normalizeRaw(value)
+                    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            }
+
+            function hasPhrase(text, phrase) {
+                const normalizedText = ' ' + normalizeChatText(text) + ' ';
+                const normalizedPhrase = normalizeChatText(phrase);
+                return normalizedPhrase && normalizedText.includes(' ' + normalizedPhrase + ' ');
+            }
+
+            function escapeRegExp(value) {
+                return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             }
 
             function getEditDistance(a, b) {
@@ -6469,191 +6516,462 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 return rows[b.length];
             }
 
-            function matchesChatTerm(normalizedQuery, queryWords, term) {
-                const normalizedTerm = normalizeChatQuery(term);
-                if (normalizedQuery.includes(normalizedTerm)) return { matched:true, fuzzy:false };
-                if (normalizedTerm.length < 4) return { matched:false, fuzzy:false };
-                const fuzzyWord = queryWords.find(word => word.length >= 4 && getEditDistance(word, normalizedTerm) <= 2);
-                return { matched:Boolean(fuzzyWord), fuzzy:Boolean(fuzzyWord) };
+            function getShipCatalog() {
+                const names = unique([
+                    ...Object.keys(shipInfoByShip || {}),
+                    ...routesData.map(route => route.schiff)
+                ]);
+                return names.map(name => {
+                    const canonical = normalizeChatText(name);
+                    const withoutMsc = canonical.replace(/^msc\s+/, '');
+                    const aliases = unique([
+                        canonical,
+                        withoutMsc,
+                        // Deutsche Schreibweisen wie „World Asien“ sind plausibel,
+                        // dürfen aber nie als Reiseziel fehlinterpretiert werden.
+                        withoutMsc.replace(/\basia\b/g, 'asien'),
+                        canonical.replace(/\basia\b/g, 'asien')
+                    ]).filter(Boolean);
+                    return { name, aliases };
+                }).sort((a, b) => {
+                    const aLength = Math.max(...a.aliases.map(alias => alias.length));
+                    const bLength = Math.max(...b.aliases.map(alias => alias.length));
+                    return bLength - aLength;
+                });
+            }
+
+            const SHIP_CATALOG = getShipCatalog();
+            const PORT_CATALOG = unique(routesData.map(route => route.startPort))
+                .map(port => {
+                    const normalized = normalizeChatText(port);
+                    const firstWord = normalized.split(' ')[0];
+                    return {
+                        port,
+                        aliases:unique([
+                            normalized,
+                            normalized.split(' ').length > 1 && firstWord.length >= 5 ? firstWord : ''
+                        ])
+                    };
+                })
+                .sort((a, b) => b.aliases[0].length - a.aliases[0].length);
+
+            function removePhrase(text, phrase) {
+                const normalizedPhrase = normalizeChatText(phrase);
+                if (!normalizedPhrase) return text;
+                return normalizeChatText(text)
+                    .replace(new RegExp('(^|\\s)' + escapeRegExp(normalizedPhrase) + '(?=\\s|$)', 'g'), ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            }
+
+            function findFuzzyShip(text) {
+                const words = normalizeChatText(text).split(' ').filter(Boolean);
+                if (!words.length) return null;
+                let best = null;
+
+                SHIP_CATALOG.forEach(entry => {
+                    entry.aliases.forEach(alias => {
+                        const aliasWords = alias.split(' ');
+                        if (aliasWords.length < 2 || words.length < aliasWords.length) return;
+                        for (let start = 0; start <= words.length - aliasWords.length; start++) {
+                            const candidate = words.slice(start, start + aliasWords.length);
+                            const distances = candidate.map((word, index) => getEditDistance(word, aliasWords[index]));
+                            const exactWords = distances.filter(distance => distance === 0).length;
+                            const totalDistance = distances.reduce((sum, distance) => sum + distance, 0);
+                            const maximumDistance = Math.max(2, aliasWords.length);
+                            if (exactWords < 1 || distances.some(distance => distance > 2) || totalDistance > maximumDistance) continue;
+                            const score = exactWords * 10 - totalDistance + aliasWords.length;
+                            if (!best || score > best.score) {
+                                best = { name:entry.name, start, count:aliasWords.length, score };
+                            }
+                        }
+                    });
+                });
+                return best;
+            }
+
+            function resolveShips(text) {
+                let remaining = normalizeChatText(text);
+                const ships = [];
+                let usedFuzzyMatch = false;
+
+                SHIP_CATALOG.forEach(entry => {
+                    const matchingAlias = entry.aliases.find(alias => hasPhrase(remaining, alias));
+                    if (!matchingAlias || ships.includes(entry.name)) return;
+                    ships.push(entry.name);
+                    remaining = removePhrase(remaining, matchingAlias);
+                });
+
+                // Unscharfe Schiffszuordnung nur für mindestens zweigliedrige Namen.
+                // Dadurch wird „Asia“ nie zu MSC World Asia geraten.
+                if (!ships.length) {
+                    const fuzzy = findFuzzyShip(remaining);
+                    if (fuzzy) {
+                        ships.push(fuzzy.name);
+                        const words = remaining.split(' ');
+                        words.splice(fuzzy.start, fuzzy.count);
+                        remaining = words.join(' ');
+                        usedFuzzyMatch = true;
+                    }
+                }
+                return { ships, remaining, usedFuzzyMatch };
+            }
+
+            function resolveRegions(text) {
+                const normalized = normalizeChatText(text);
+                const matches = [];
+                let usedFuzzyMatch = false;
+
+                REGION_ENTITIES.forEach(entity => {
+                    const exact = entity.aliases.some(alias => hasPhrase(normalized, alias));
+                    if (exact) {
+                        matches.push(entity);
+                        return;
+                    }
+
+                    // Fuzzy-Matches sind auf lange, eindeutige Einzelwörter begrenzt.
+                    // Insbesondere „Asien“ wird nie fuzzy aufgelöst, damit Schiffs-
+                    // namen wie MSC World Asia nicht in ein Reiseziel kippen.
+                    const words = normalized.split(' ').filter(Boolean);
+                    const fuzzy = entity.aliases.some(alias => {
+                        if (alias === 'asien' || alias.includes(' ') || alias.length < 6) return false;
+                        return words.some(word => word.length >= 6 && getEditDistance(word, alias) <= 1);
+                    });
+                    if (fuzzy) {
+                        matches.push(entity);
+                        usedFuzzyMatch = true;
+                    }
+                });
+
+                return {
+                    regions:unique(matches.flatMap(entity => entity.regions)),
+                    regionLabel:matches.length === 1 ? matches[0].label : '',
+                    usedFuzzyMatch
+                };
+            }
+
+            function resolvePorts(text) {
+                const normalized = normalizeChatText(text);
+                const hasDepartureCue = /\b(?:ab|von|abfahrt|abfahrtshafen|start|starten)\b/.test(normalized);
+                if (!hasDepartureCue) return [];
+                return unique(PORT_CATALOG.flatMap(entry => entry.aliases.some(alias => hasPhrase(normalized, alias)) ? [entry.port] : []));
+            }
+
+            function pad(value) {
+                return String(value).padStart(2, '0');
+            }
+
+            function normalizeYear(value) {
+                const number = Number(value);
+                return String(value).length === 2 ? 2000 + number : number;
+            }
+
+            function toIsoDate(day, month, year) {
+                const normalizedYear = normalizeYear(year);
+                const date = new Date(Date.UTC(normalizedYear, Number(month) - 1, Number(day)));
+                if (date.getUTCFullYear() !== normalizedYear || date.getUTCMonth() !== Number(month) - 1 || date.getUTCDate() !== Number(day)) return '';
+                return normalizedYear + '-' + pad(month) + '-' + pad(day);
+            }
+
+            function getMonthRange(month, year) {
+                const normalizedYear = normalizeYear(year);
+                const lastDay = new Date(Date.UTC(normalizedYear, Number(month), 0)).getUTCDate();
+                return {
+                    startDate:normalizedYear + '-' + pad(month) + '-01',
+                    endDate:normalizedYear + '-' + pad(month) + '-' + pad(lastDay)
+                };
+            }
+
+            function parseTravelTime(rawQuery) {
+                const raw = normalizeRaw(rawQuery);
+                const numericDates = [...raw.matchAll(/\b(\d{1,2})\s*[.\/-]\s*(\d{1,2})\s*[.\/-]\s*(\d{2,4})\b/g)]
+                    .map(match => toIsoDate(match[1], match[2], match[3]))
+                    .filter(Boolean);
+                if (numericDates.length >= 2 && /\b(?:bis|zwischen|und)\b|[-–]/.test(raw)) {
+                    const ordered = numericDates.slice(0, 2).sort();
+                    return { startDate:ordered[0], endDate:ordered[1], precision:'range' };
+                }
+                if (numericDates.length === 1) {
+                    return { startDate:numericDates[0], endDate:'', precision:'departure' };
+                }
+
+                const namedRange = raw.match(/\b(?:vom|von|zwischen)?\s*(\d{1,2})\.?\s*(?:bis|und|-|–)\s*(\d{1,2})\.?\s*(januar|jan|februar|feb|marz|maerz|april|apr|mai|juni|jun|juli|jul|august|aug|september|sep|oktober|okt|november|nov|dezember|dez)\.?\s+(20\d{2}|\d{2})\b/);
+                if (namedRange && MONTHS[namedRange[3]]) {
+                    const first = toIsoDate(namedRange[1], MONTHS[namedRange[3]], namedRange[4]);
+                    const second = toIsoDate(namedRange[2], MONTHS[namedRange[3]], namedRange[4]);
+                    if (first && second) return { startDate:[first, second].sort()[0], endDate:[first, second].sort()[1], precision:'range' };
+                }
+
+                const monthYear = raw.match(/\b(januar|jan|februar|feb|marz|maerz|april|apr|mai|juni|jun|juli|jul|august|aug|september|sep|oktober|okt|november|nov|dezember|dez)\.?\s+(20\d{2}|\d{2})\b/);
+                if (monthYear && MONTHS[monthYear[1]]) {
+                    return { ...getMonthRange(MONTHS[monthYear[1]], monthYear[2]), precision:'month' };
+                }
+
+                const yearMatch = raw.match(/\b(20\d{2})\b/);
+                const seasons = [
+                    { terms:['fruhling', 'fruehling'], start:3, end:5 },
+                    { terms:['sommer'], start:6, end:8 },
+                    { terms:['herbst'], start:9, end:11 },
+                    { terms:['winter'], start:12, end:2 }
+                ];
+                if (yearMatch) {
+                    const season = seasons.find(entry => entry.terms.some(term => hasPhrase(raw, term)));
+                    if (season) {
+                        const year = Number(yearMatch[1]);
+                        const start = year + '-' + pad(season.start) + '-01';
+                        const endYear = season.end < season.start ? year + 1 : year;
+                        const end = getMonthRange(season.end, endYear).endDate;
+                        return { startDate:start, endDate:end, precision:'season' };
+                    }
+                    return { startDate:yearMatch[1] + '-01-01', endDate:yearMatch[1] + '-12-31', precision:'year' };
+                }
+                return { startDate:'', endDate:'', precision:'' };
+            }
+
+            function getDurationForNights(nights) {
+                return allDurationsList.find(option => nights >= option.min && nights <= option.max)?.value || '';
+            }
+
+            function getDurationValuesForRange(minimum, maximum) {
+                return allDurationsList
+                    .filter(option => maximum >= option.min && minimum <= option.max)
+                    .map(option => option.value);
+            }
+
+            function parseDuration(rawQuery) {
+                const raw = normalizeRaw(rawQuery);
+                const text = normalizeChatText(rawQuery);
+                const range = raw.match(/\b(\d{1,3})\s*(?:bis|-|–)\s*(\d{1,3})\s*(?:nacht|nachte)\b/);
+                if (range) {
+                    const minimum = Math.min(Number(range[1]), Number(range[2]));
+                    const maximum = Math.max(Number(range[1]), Number(range[2]));
+                    return { durations:getDurationValuesForRange(minimum, maximum), exactNights:null };
+                }
+
+                const nightsMatch = text.match(/\b(\d{1,3})\s*(?:nacht|nachte)\b/);
+                if (nightsMatch) {
+                    const exactNights = Number(nightsMatch[1]);
+                    return { durations:[getDurationForNights(exactNights)].filter(Boolean), exactNights };
+                }
+
+                const daysMatch = text.match(/\b(\d{1,3})\s*tage?\b/);
+                if (daysMatch) {
+                    const exactNights = Math.max(0, Number(daysMatch[1]) - 1);
+                    return { durations:[getDurationForNights(exactNights)].filter(Boolean), exactNights };
+                }
+                if (/\b(?:eine|1)\s+woche\b/.test(text)) return { durations:['6-7'], exactNights:null };
+                if (/\b(?:zwei|2)\s+wochen\b/.test(text)) return { durations:['8-14'], exactNights:null };
+                if (/\bkurzreise\b/.test(text)) return { durations:['0-5'], exactNights:null };
+                if (/\b(?:langreise|lange reise|weltreise)\b/.test(text)) return { durations:['15-999'], exactNights:null };
+                return { durations:[], exactNights:null };
+            }
+
+            function extractParty(rawQuery) {
+                const match = String(rawQuery).match(/\b(\d+)\s*(Erwachsene?|Personen?|Gäste?|Kinder(?:\s*\([^)]*\))?)\b/gi);
+                return match ? match.join(', ') : '';
+            }
+
+            function extractPreferences(rawQuery) {
+                const text = normalizeChatText(rawQuery);
+                const preferences = [
+                    { terms:['familie', 'kinder', 'wasserpark'], label:'familienfreundliches Bord-Erlebnis' },
+                    { terms:['yacht club', 'luxus', 'exklusiv'], label:'Yacht Club oder ein besonders exklusives Erlebnis' },
+                    { terms:['wellness', 'spa', 'entspannung', 'ruhig'], label:'Wellness und Entspannung' },
+                    { terms:['nachhaltig', 'lng', 'umwelt'], label:'Nachhaltigkeit' },
+                    { terms:['kulinarik', 'restaurant', 'genuss'], label:'Kulinarik' },
+                    { terms:['entertainment', 'show', 'party'], label:'Entertainment' }
+                ];
+                return preferences
+                    .filter(entry => entry.terms.some(term => hasPhrase(text, term)))
+                    .map(entry => entry.label);
             }
 
             function parseRouteRequest(query) {
-                const normalized = normalizeChatQuery(query);
-                const queryWords = normalized.match(/[a-z0-9]+/g) || [];
-                const regionAliases = [
-                    { region:'Karibik & Antillen', terms:['karibik', 'antillen', 'bahamas', 'jamaika'] },
-                    { region:'Mittelmeer', terms:['mittelmeer', 'mediterran', 'italien', 'griechenland', 'spanien'] },
-                    { region:'Nordeuropa', terms:['nordeuropa', 'norwegen', 'fjord', 'ostsee', 'baltikum'] },
-                    { region:'Kanarische Inseln und Madeira', terms:['kanaren', 'madeira', 'teneriffa'] },
-                    { region:'Alaska', terms:['alaska'] },
-                    { region:'Südamerika', terms:['sudamerika', 'suedamerika', 'brasilien'] },
-                    { region:'Asien', terms:['asien', 'japan', 'tokio'] },
-                    { region:'Südafrika', terms:['sudafrika', 'suedafrika'] },
-                    { regions:['World Cruise', 'MSC Grand Voyages'], label:'Weltreise & lange Reisen', terms:['world cruise', 'weltreise', 'welt reise', 'einmal um die welt', 'rund um die welt'] },
-                    { region:'MSC Grand Voyages', terms:['grand voyage', 'grand voyages'] }
-                ];
-                const regionMatches = regionAliases.map(entry => ({
-                    entry,
-                    terms:entry.terms.map(term => matchesChatTerm(normalized, queryWords, term))
-                })).filter(result => result.terms.some(term => term.matched));
-                const regions = [...new Set(regionMatches.flatMap(({ entry }) => entry.regions || [entry.region]))];
-                const regionLabel = regionMatches.length === 1 ? (regionMatches[0].entry.label || regionMatches[0].entry.region) : '';
-                const usedFuzzyMatch = regionMatches.some(result => result.terms.some(term => term.fuzzy));
-                const ships = [...new Set(routesData.map(route => route.schiff))];
-                let ship = ships.find(name => {
-                    const normalizedName = normalizeChatQuery(name);
-                    const withoutMsc = normalizedName.replace(/^msc\s+/, '');
-                    return normalized.includes(normalizedName) || (withoutMsc.length > 4 && normalized.includes(withoutMsc));
-                });
-                let usedFuzzyShipMatch = false;
-                if (!ship) {
-                    ship = ships.find(name => {
-                        const shipWords = normalizeChatQuery(name).replace(/^msc\s+/, '').match(/[a-z0-9]+/g) || [];
-                        const matchedWords = shipWords.filter(shipWord => queryWords.some(queryWord => getEditDistance(queryWord, shipWord) <= 2));
-                        return matchedWords.length >= Math.min(2, shipWords.length);
-                    });
-                    usedFuzzyShipMatch = Boolean(ship);
-                }
-                const months = {
-                    januar:1, jan:1, februar:2, feb:2, maerz:3, marz:3, märz:3,
-                    april:4, apr:4, mai:5, juni:6, jun:6, juli:7, jul:7, august:8, aug:8,
-                    september:9, sep:9, oktober:10, okt:10, november:11, nov:11, dezember:12, dez:12
-                };
-                // Akzeptiert „Januar 2028“, „Januar 28“, „Jan. 28“ und „01/2028“.
-                const monthMatch = normalized.match(/\b([a-zä]+)\.?\s+(20\d{2}|\d{2})\b/);
-                const numericMonthMatch = normalized.match(/\b(0?[1-9]|1[0-2])\s*[/.\-]\s*(20\d{2}|\d{2})\b/);
-                let startDate = '';
-                let endDate = '';
-                if (monthMatch && months[monthMatch[1]]) {
-                    const year = monthMatch[2].length === 2 ? 2000 + Number(monthMatch[2]) : Number(monthMatch[2]);
-                    const month = months[monthMatch[1]];
-                    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-                    startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-                    endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-                } else if (numericMonthMatch) {
-                    const month = Number(numericMonthMatch[1]);
-                    const year = numericMonthMatch[2].length === 2 ? 2000 + Number(numericMonthMatch[2]) : Number(numericMonthMatch[2]);
-                    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-                    startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-                    endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-                }
-                const nightsMatch = normalized.match(/\b(\d{1,2})\s*(nacht|nachte)\b/);
-                let duration = '';
-                if (nightsMatch) {
-                    const nights = Number(nightsMatch[1]);
-                    duration = allDurationsList.find(option => nights >= option.min && nights <= option.max)?.value || '';
-                } else if (normalized.includes('kurzreise')) {
-                    duration = '0-5';
-                } else if (normalized.includes('zwei wochen') || normalized.includes('2 wochen')) {
-                    duration = '8-14';
-                }
+                const ships = resolveShips(query);
+                const regions = resolveRegions(ships.remaining);
+                const travelTime = parseTravelTime(query);
+                const duration = parseDuration(query);
                 return {
-                    region:regions.length === 1 ? regions[0] : '',
-                    regions,
-                    regionLabel,
-                    ship:ship || '',
-                    duration,
-                    startDate,
-                    endDate,
-                    original:query,
-                    usedFuzzyMatch:usedFuzzyMatch || usedFuzzyShipMatch
+                    regions:regions.regions,
+                    regionLabel:regions.regionLabel,
+                    ports:resolvePorts(ships.remaining),
+                    ships:ships.ships,
+                    durations:duration.durations,
+                    exactNights:duration.exactNights,
+                    startDate:travelTime.startDate,
+                    endDate:travelTime.endDate,
+                    datePrecision:travelTime.precision,
+                    party:extractParty(query),
+                    preferences:extractPreferences(query),
+                    original:String(query || '').trim(),
+                    usedFuzzyMatch:ships.usedFuzzyMatch || regions.usedFuzzyMatch
                 };
+            }
+
+            function emptyCriteria() {
+                return {
+                    regions:[], regionLabel:'', ports:[], ships:[], durations:[], exactNights:null,
+                    startDate:'', endDate:'', datePrecision:'', party:'', preferences:[], original:''
+                };
+            }
+
+            function normalizeCriteria(criteria = {}) {
+                return {
+                    ...emptyCriteria(),
+                    ...criteria,
+                    regions:unique(criteria.regions),
+                    ports:unique(criteria.ports),
+                    ships:unique(criteria.ships),
+                    durations:unique(criteria.durations),
+                    preferences:unique(criteria.preferences),
+                    exactNights:Number.isInteger(criteria.exactNights) ? criteria.exactNights : null
+                };
+            }
+
+            function getCurrentSearchCriteria() {
+                return normalizeCriteria({
+                    regions:[...selectedRegions],
+                    ports:[...selectedPorts],
+                    ships:[...selectedShips],
+                    durations:[...selectedDurations],
+                    exactNights:Number.isInteger(chatExactNights) ? chatExactNights : null,
+                    startDate:document.getElementById('startDate')?.value || '',
+                    endDate:document.getElementById('endDate')?.value || ''
+                });
+            }
+
+            function mergeCriteria(base, update) {
+                const current = normalizeCriteria(base);
+                const incoming = normalizeCriteria(update);
+                return normalizeCriteria({
+                    ...current,
+                    // Eine explizit genannte neue Dimension ersetzt nur diese
+                    // Dimension. Alle nicht erwähnten Seitenfilter bleiben hart.
+                    regions:incoming.regions.length ? incoming.regions : current.regions,
+                    regionLabel:incoming.regionLabel || current.regionLabel,
+                    ports:incoming.ports.length ? incoming.ports : current.ports,
+                    ships:incoming.ships.length ? incoming.ships : current.ships,
+                    durations:incoming.durations.length ? incoming.durations : current.durations,
+                    exactNights:incoming.exactNights !== null ? incoming.exactNights : current.exactNights,
+                    startDate:incoming.startDate || current.startDate,
+                    endDate:incoming.endDate || current.endDate,
+                    datePrecision:incoming.datePrecision || current.datePrecision,
+                    party:incoming.party || current.party,
+                    preferences:incoming.preferences.length ? incoming.preferences : current.preferences,
+                    original:incoming.original || current.original
+                });
+            }
+
+            function routeMatchesCriteria(route, criteria) {
+                if (criteria.regions.length && !criteria.regions.includes(route.region)) return false;
+                if (criteria.ports.length && !criteria.ports.includes(route.startPort)) return false;
+                if (criteria.ships.length && !criteria.ships.includes(route.schiff)) return false;
+                if (criteria.exactNights !== null && route.nights !== criteria.exactNights) return false;
+                if (criteria.durations.length) {
+                    const matchesDuration = criteria.durations.some(value => {
+                        const option = allDurationsList.find(entry => entry.value === value);
+                        return option && route.nights >= option.min && route.nights <= option.max;
+                    });
+                    if (!matchesDuration) return false;
+                }
+                return true;
             }
 
             function getMatchingChatRoutes(criteria) {
+                const normalized = normalizeCriteria(criteria);
+                const startDate = normalized.startDate || getTodayISO();
                 return routesData
                     .map(route => ({
                         route,
-                        // Dieselbe Datumslogik wie die sichtbare Routensuche verwenden,
-                        // damit der Chat niemals Treffer verspricht, die die Seite nicht zeigen kann.
-                        departures:getValidDepartures(route, criteria.startDate || getTodayISO(), criteria.endDate)
+                        departures:getValidDepartures(route, startDate, normalized.endDate)
                     }))
-                    .filter(({ route, departures }) =>
-                        (!(criteria.regions?.length || criteria.region) || (criteria.regions?.length ? criteria.regions.includes(route.region) : route.region === criteria.region)) &&
-                        (!criteria.ship || route.schiff === criteria.ship) &&
-                        (!criteria.duration || (() => {
-                            const duration = allDurationsList.find(option => option.value === criteria.duration);
-                            return duration && route.nights >= duration.min && route.nights <= duration.max;
-                        })()) &&
-                        departures.length > 0
-                    )
+                    .filter(({ route, departures }) => routeMatchesCriteria(route, normalized) && departures.length > 0)
                     .sort((a, b) => a.departures[0].start.localeCompare(b.departures[0].start));
             }
 
-            function describeChatCriteria(criteria) {
+            function getDistinctNights(matches) {
+                return unique(matches.map(match => match.route.nights)).sort((a, b) => a - b);
+            }
+
+            function getDistinctPorts(matches) {
+                return unique(matches.map(match => match.route.startPort)).sort((a, b) => a.localeCompare(b, 'de'));
+            }
+
+            function getDistinctShips(matches) {
+                return unique(matches.map(match => match.route.schiff)).sort((a, b) => a.localeCompare(b, 'de'));
+            }
+
+            function getDistinctDurationValues(matches) {
+                return unique(matches.map(match => getDurationForNights(match.route.nights)));
+            }
+
+            function formatDateRange(criteria) {
+                if (criteria.startDate && criteria.endDate) {
+                    return 'Abreise ab ' + formatFilterDate(criteria.startDate) + ', Rückkehr bis ' + formatFilterDate(criteria.endDate);
+                }
+                if (criteria.startDate) return 'Abreise ab ' + formatFilterDate(criteria.startDate);
+                return '';
+            }
+
+            function describeCriteria(criteria) {
+                const normalized = normalizeCriteria(criteria);
                 const parts = [];
-                if (criteria.regionLabel) parts.push(criteria.regionLabel);
-                else if (criteria.regions?.length) parts.push(criteria.regions.join(' oder '));
-                else if (criteria.region) parts.push(criteria.region);
-                if (criteria.ship) parts.push(criteria.ship);
-                if (criteria.duration) parts.push(allDurationsList.find(option => option.value === criteria.duration)?.label || criteria.duration);
-                if (criteria.startDate) parts.push(new Intl.DateTimeFormat('de-DE', { month:'long', year:'numeric' }).format(new Date(`${criteria.startDate}T00:00:00`)));
+                if (normalized.regionLabel) parts.push(normalized.regionLabel);
+                else if (normalized.regions.length) parts.push(joinNaturally(normalized.regions));
+                if (normalized.ports.length) parts.push('ab ' + joinNaturally(normalized.ports));
+                if (normalized.ships.length) parts.push(joinNaturally(normalized.ships));
+                if (normalized.exactNights !== null) parts.push(normalized.exactNights + ' Nächte');
+                else if (normalized.durations.length) {
+                    parts.push(joinNaturally(normalized.durations.map(value => allDurationsList.find(option => option.value === value)?.label || value)));
+                }
+                const dates = formatDateRange(normalized);
+                if (dates) parts.push(dates);
                 return parts.join(' · ');
             }
 
+            function getFilterSummary(criteria = getCurrentSearchCriteria()) {
+                const description = describeCriteria(criteria);
+                return description ? [description] : [];
+            }
+
+            function getFavoriteRoutes() {
+                return routesData.filter(route => favoriteRouteIds.has(route.id));
+            }
+
+            function getSharedRoute() {
+                const id = Number(new URLSearchParams(window.location.search).get('route'));
+                return Number.isInteger(id) && id > 0 ? routesData.find(route => route.id === id) : null;
+            }
+
+            function addResultRegions(criteria, matches) {
+                if (criteria.regions.length) return criteria;
+                const regions = unique(matches.map(match => match.route.region));
+                return normalizeCriteria({ ...criteria, regions, regionLabel:'' });
+            }
+
             function applyChatCriteriaToPage(criteria) {
-                // Eine zuvor geöffnete Einzelroute bzw. Favoritenansicht darf die Chat-Suche nicht überdecken.
+                const normalized = normalizeCriteria(criteria);
                 showingFavorites = false;
                 const url = new URL(window.location.href);
                 if (url.searchParams.has('route')) {
                     url.searchParams.delete('route');
                     window.history.replaceState({}, '', url.toString());
                 }
-                selectedRegions = criteria.regions?.length ? criteria.regions : (criteria.region ? [criteria.region] : []);
-                selectedShips = criteria.ship ? [criteria.ship] : [];
-                selectedPorts = [];
-                selectedDurations = criteria.duration ? [criteria.duration] : [];
-                document.getElementById('startDate').value = criteria.startDate || getTodayISO();
-                document.getElementById('endDate').value = criteria.endDate || '';
+
+                selectedRegions = [...normalized.regions];
+                selectedPorts = [...normalized.ports];
+                selectedShips = [...normalized.ships];
+                selectedDurations = [...normalized.durations];
+                chatExactNights = normalized.exactNights;
+
+                document.getElementById('startDate').value = normalized.startDate || getTodayISO();
+                document.getElementById('endDate').value = normalized.endDate || '';
                 document.querySelectorAll('#regionChips .chip').forEach(chip => {
                     chip.classList.toggle('active', selectedRegions.includes(chip.dataset.value));
                 });
                 updatePortFilter();
                 updateAvailableFilterOptions();
                 renderRoutes();
-            }
-
-            function getCriteriaRegions(criteria) {
-                return criteria.regions?.length ? criteria.regions : (criteria.region ? [criteria.region] : []);
-            }
-
-            function addResultRegions(criteria, matches) {
-                if (getCriteriaRegions(criteria).length) return criteria;
-                const resultRegions = [...new Set(matches.map(({ route }) => route.region))];
-                return { ...criteria, regions:resultRegions, region:'', regionLabel:'' };
-            }
-
-            function findSimilarChatResults(criteria) {
-                const alternatives = [];
-                const hasRegions = getCriteriaRegions(criteria).length > 0;
-                if (criteria.ship) {
-                    alternatives.push({
-                        criteria:{ ...criteria, ship:'' },
-                        reason:'Das gewünschte Schiff ist im gewählten Zeitraum oder Ziel nicht verfügbar. Deshalb zeigen wir dir ähnliche Routen ohne genaue Schiffsvorgabe.'
-                    });
-                }
-                if (criteria.startDate || criteria.endDate) {
-                    alternatives.push({
-                        criteria:{ ...criteria, startDate:'', endDate:'' },
-                        reason:'Für deinen gewünschten Zeitraum gibt es keine exakte Route. Deshalb zeigen wir dir ähnliche Routen zu deinem Ziel mit anderen Abfahrtsdaten.'
-                    });
-                }
-                if (hasRegions) {
-                    alternatives.push({
-                        criteria:{ ...criteria, region:'', regions:[], regionLabel:'' },
-                        reason:'Für das gewünschte Ziel gibt es keine exakte Route. Deshalb zeigen wir dir ähnliche verfügbare Routen.'
-                    });
-                }
-                alternatives.push({
-                    criteria:{ region:'', regions:[], regionLabel:'', ship:'', startDate:'', endDate:'' },
-                    reason:'Wir zeigen dir ähnliche verfügbare Routen, die als Ausgangspunkt für deine persönliche Beratung dienen können.'
-                });
-
-                for (const alternative of alternatives) {
-                    const matches = getMatchingChatRoutes(alternative.criteria);
-                    if (matches.length) return { ...alternative, matches };
-                }
-                return null;
             }
 
             function showChatSearchNotice(message, isSimilar = false) {
@@ -6678,192 +6996,530 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 });
             }
 
+            function finishWithVisibleResults(criteria, matches) {
+                const displayCriteria = addResultRegions(criteria, matches);
+                const description = describeCriteria(criteria);
+                advisorState.criteria = displayCriteria;
+                applyChatCriteriaToPage(displayCriteria);
+                const fuzzyHint = criteria.usedFuzzyMatch ? ' Ich habe einen wahrscheinlichen Tippfehler berücksichtigt.' : '';
+                const countText = matches.length + ' gelistete ' + (matches.length === 1 ? 'Route' : 'Routen');
+                showChatSearchNotice('Chat-Suche: ' + countText + (description ? ' für ' + description : '') + '.' + fuzzyHint);
+                addMessage('Ich habe ' + countText + (description ? ' für ' + description : '') + ' direkt in der Routensuche vorbereitet.' + fuzzyHint);
+                setActions('Was möchtest du als Nächstes tun?', [
+                    { label:'Ergebnisse ansehen', run:() => { setOpen(false); focusRouteResults(); } },
+                    { label:'Auswahl weiter verfeinern', run:() => guideSearch(displayCriteria, 'current') },
+                    { label:'Persönliches Angebot vorbereiten', run:() => askForOfferDetails(displayCriteria) }
+                ]);
+                setOpen(false);
+                focusRouteResults();
+            }
+
+            function offerNoResults(criteria, mode = 'guided') {
+                const normalized = normalizeCriteria(criteria);
+                advisorState.criteria = normalized;
+                advisorState.originalCriteria = advisorState.originalCriteria || normalized;
+                const description = describeCriteria(normalized);
+                const choices = [];
+
+                if (normalized.startDate || normalized.endDate) {
+                    choices.push({
+                        label:'Zeitraum ändern',
+                        run:() => askForTravelTime({ ...normalized, startDate:'', endDate:'', datePrecision:'' }, mode)
+                    });
+                }
+                if (normalized.exactNights !== null || normalized.durations.length) {
+                    choices.push({
+                        label:'Reisedauer öffnen',
+                        run:() => guideSearch({ ...normalized, durations:[], exactNights:null }, mode)
+                    });
+                }
+                if (normalized.ports.length) {
+                    choices.push({
+                        label:'Anderen Hafen wählen',
+                        run:() => askForPort({ ...normalized, ports:[] }, mode)
+                    });
+                }
+                if (normalized.ships.length) {
+                    choices.push({
+                        label:'Anderes Schiff wählen',
+                        run:() => askForShip({ ...normalized, ships:[] }, mode)
+                    });
+                }
+                if (normalized.regions.length) {
+                    choices.push({
+                        label:'Anderes Ziel wählen',
+                        run:() => askForDestination({ ...normalized, regions:[], regionLabel:'' }, mode)
+                    });
+                }
+                choices.push({
+                    label:'Persönliche Alternative anfragen',
+                    run:() => finishWithContact('Ich halte deinen ursprünglichen Wunsch fest. Unser Team kann auch nicht gelistete Termine oder passende Alternativen prüfen.')
+                });
+
+                addMessage('Für ' + (description || 'diese Kombination') + ' ist aktuell keine Route in den hinterlegten Daten gelistet. Ich ändere keinen deiner Wünsche automatisch – wähle einfach, welche Bedingung flexibel sein darf.');
+                setActions('Was darf ich anpassen?', choices);
+            }
+
             function showChatSearch(criteria) {
-                const exactMatches = getMatchingChatRoutes(criteria);
-                advisorState.criteria = criteria;
-                const description = describeChatCriteria(criteria);
-                if (exactMatches.length) {
-                    const displayCriteria = addResultRegions(criteria, exactMatches);
-                    applyChatCriteriaToPage(displayCriteria);
-                    const fuzzyHint = criteria.usedFuzzyMatch ? ' Ich habe Tippfehler berücksichtigt.' : '';
-                    showChatSearchNotice(`Chat-Suche: ${exactMatches.length} passende ${exactMatches.length === 1 ? 'Route' : 'Routen'}${description ? ` für ${description}` : ''}.${fuzzyHint}`);
-                    addMessage(`Ich habe ${exactMatches.length} passende ${exactMatches.length === 1 ? 'Route' : 'Routen'}${description ? ` für ${description}` : ''} gefunden.${fuzzyHint} Ich zeige sie dir jetzt direkt in der Kreuzfahrtsuche.`);
-                    setOpen(false);
-                    focusRouteResults();
+                const normalized = normalizeCriteria(criteria);
+                const matches = getMatchingChatRoutes(normalized);
+                if (matches.length) {
+                    finishWithVisibleResults(normalized, matches);
                 } else {
-                    const similar = findSimilarChatResults(criteria);
-                    if (similar) {
-                        const displayCriteria = addResultRegions(similar.criteria, similar.matches);
-                        applyChatCriteriaToPage(displayCriteria);
-                        showChatSearchNotice(`Ähnliche Routen: ${similar.reason}`, true);
-                        addMessage(`Ich finde keine exakte Route${description ? ` für ${description}` : ''}. ${similar.reason} Die ähnlichen Routen zeige ich dir jetzt in der Kreuzfahrtsuche.`);
-                        setOpen(false);
-                        focusRouteResults();
+                    offerNoResults(normalized);
+                }
+            }
+
+            function getAvailableYears(criteria) {
+                const withoutDate = normalizeCriteria({ ...criteria, startDate:'', endDate:'' });
+                const years = getMatchingChatRoutes(withoutDate)
+                    .flatMap(match => match.departures.map(departure => departure.start.slice(0, 4)));
+                return unique(years).sort();
+            }
+
+            function addShowResultsChoice(choices, criteria) {
+                const matches = getMatchingChatRoutes(criteria);
+                if (matches.length) {
+                    choices.push({ label:'Passende Routen zeigen', run:() => showChatSearch(criteria) });
+                }
+                return choices;
+            }
+
+            function askForDestination(criteria, mode = 'guided') {
+                const regionChoices = [...document.querySelectorAll('#regionChips .chip')]
+                    .map(chip => ({ label:chip.textContent.trim(), value:chip.dataset.value }));
+                addMessage(mode === 'current'
+                    ? 'Dein Ziel ist noch offen. Welche Region soll für deine aktuelle Suche gelten?'
+                    : 'Welches Reiseziel reizt dich?');
+                const choices = regionChoices.map(entry => ({
+                    label:entry.label,
+                    run:() => guideSearch({ ...criteria, regions:[entry.value], regionLabel:entry.label }, mode)
+                }));
+                choices.push({
+                    label:'Ziel frei eingeben',
+                    run:() => askForText(
+                        'Nenne dein Wunschziel, zum Beispiel „Kanaren“, „Alaska“ oder „Grand Voyages“.',
+                        'Reiseziel eingeben',
+                        answer => {
+                            if (!answer) {
+                                askForDestination(criteria, mode);
+                                return;
+                            }
+                            addMessage(answer, true);
+                            const parsed = parseRouteRequest(answer);
+                            if (!parsed.regions.length) {
+                                addMessage('Dieses Ziel konnte ich nicht sicher einer unserer Regionen zuordnen. Wähle gern eine Region aus der Liste.');
+                                askForDestination(criteria, mode);
+                                return;
+                            }
+                            guideSearch(mergeCriteria(criteria, parsed), mode);
+                        }
+                    )
+                });
+                setActions('Reiseziel auswählen', choices);
+            }
+
+            function askForTravelTime(criteria, mode = 'guided') {
+                const years = getAvailableYears(criteria);
+                addMessage('Wann möchtest du reisen? Im Filter bedeutet ein Enddatum: Die Rückkehr soll spätestens an diesem Tag erfolgen.');
+                const choices = years.map(year => ({
+                    label:'Im Jahr ' + year,
+                    run:() => guideSearch({ ...criteria, startDate:year + '-01-01', endDate:year + '-12-31', datePrecision:'year' }, mode)
+                }));
+                choices.push({
+                    label:'Monat oder Zeitraum eingeben',
+                    run:() => askForText(
+                        'Nenne einfach einen Monat, ein Jahr oder einen Zeitraum – zum Beispiel „September 2027“ oder „01.09.2027 bis 30.09.2027“.',
+                        'z. B. September 2027',
+                        answer => {
+                            if (!answer) {
+                                askForTravelTime(criteria, mode);
+                                return;
+                            }
+                            addMessage(answer, true);
+                            const parsed = parseRouteRequest(answer);
+                            if (!parsed.startDate) {
+                                addMessage('Den Zeitraum konnte ich noch nicht sicher lesen. Bitte nenne Monat/Jahr oder ein vollständiges Datum.');
+                                askForTravelTime(criteria, mode);
+                                return;
+                            }
+                            guideSearch(mergeCriteria(criteria, parsed), mode);
+                        }
+                    )
+                });
+                choices.push({
+                    label:'Reisezeit noch offen',
+                    run:() => guideSearch({ ...criteria, startDate:getTodayISO(), endDate:'', datePrecision:'open' }, mode)
+                });
+                setActions('Zeitraum wählen', addShowResultsChoice(choices, criteria));
+            }
+
+            function askForDuration(criteria, mode = 'guided') {
+                const matches = getMatchingChatRoutes(criteria);
+                const durationValues = getDistinctDurationValues(matches);
+                if (durationValues.length < 2) {
+                    guideSearch(criteria, mode);
+                    return;
+                }
+                addMessage('Wie lange möchtest du ungefähr unterwegs sein? Ich zeige nur Dauern, die zu deinen bisherigen Kriterien passen.');
+                const choices = durationValues.map(value => {
+                    const option = allDurationsList.find(entry => entry.value === value);
+                    return {
+                        label:option?.label || value,
+                        run:() => guideSearch({ ...criteria, durations:[value], exactNights:null }, mode)
+                    };
+                });
+                choices.push({
+                    label:'Dauer frei eingeben',
+                    run:() => askForText(
+                        'Wie viele Nächte oder Tage passen dir ideal?',
+                        'z. B. 7 Nächte oder zwei Wochen',
+                        answer => {
+                            if (!answer) {
+                                askForDuration(criteria, mode);
+                                return;
+                            }
+                            addMessage(answer, true);
+                            const parsed = parseRouteRequest(answer);
+                            if (!parsed.durations.length && parsed.exactNights === null) {
+                                addMessage('Die Reisedauer konnte ich noch nicht sicher einordnen.');
+                                askForDuration(criteria, mode);
+                                return;
+                            }
+                            guideSearch(mergeCriteria(criteria, parsed), mode);
+                        }
+                    )
+                });
+                choices.push({ label:'Bei der Dauer bin ich offen', run:() => guideSearch(criteria, mode) });
+                setActions('Reisedauer auswählen', addShowResultsChoice(choices, criteria));
+            }
+
+            function askForPort(criteria, mode = 'guided') {
+                const ports = getDistinctPorts(getMatchingChatRoutes(criteria));
+                if (ports.length < 2) {
+                    guideSearch(criteria, mode);
+                    return;
+                }
+                const buttonPorts = ports.slice(0, 6);
+                const moreHint = ports.length > buttonPorts.length
+                    ? ' Es gibt außerdem weitere Häfen – du kannst jeden davon frei eingeben.'
+                    : '';
+                addMessage('Welcher Abfahrtshafen ist für dich am bequemsten?' + moreHint);
+                const choices = buttonPorts.map(port => ({
+                    label:'Ab ' + port,
+                    run:() => guideSearch({ ...criteria, ports:[port] }, mode)
+                }));
+                choices.push({
+                    label:'Hafen frei eingeben',
+                    run:() => askForText(
+                        'Nenne den gewünschten Abfahrtshafen.',
+                        'z. B. ab Hamburg oder ab Barcelona',
+                        answer => {
+                            if (!answer) {
+                                askForPort(criteria, mode);
+                                return;
+                            }
+                            addMessage(answer, true);
+                            const parsed = parseRouteRequest('ab ' + answer);
+                            if (!parsed.ports.length) {
+                                addMessage('Diesen Abfahrtshafen finde ich im aktuellen Routenprogramm nicht eindeutig. Wähle gern einen Hafen aus der Liste.');
+                                askForPort(criteria, mode);
+                                return;
+                            }
+                            guideSearch({ ...criteria, ports:parsed.ports }, mode);
+                        }
+                    )
+                });
+                choices.push({ label:'Hafen ist mir offen', run:() => guideSearch(criteria, mode) });
+                setActions('Abfahrtshafen wählen', addShowResultsChoice(choices, criteria));
+            }
+
+            function askForShip(criteria, mode = 'guided') {
+                const ships = getDistinctShips(getMatchingChatRoutes(criteria));
+                if (ships.length < 2) {
+                    guideSearch(criteria, mode);
+                    return;
+                }
+                const buttonShips = ships.slice(0, 6);
+                const moreHint = ships.length > buttonShips.length
+                    ? ' Nenne mir gern auch ein anderes Schiff aus dem Programm.'
+                    : '';
+                addMessage('Hast du ein Wunschschiff oder ist dir das Bord-Erlebnis offen?' + moreHint);
+                const choices = buttonShips.map(ship => ({
+                    label:ship,
+                    run:() => guideSearch({ ...criteria, ships:[ship] }, mode)
+                }));
+                choices.push({
+                    label:'Schiff frei eingeben',
+                    run:() => askForText(
+                        'Wie heißt dein Wunschschiff?',
+                        'z. B. MSC World Asia',
+                        answer => {
+                            if (!answer) {
+                                askForShip(criteria, mode);
+                                return;
+                            }
+                            addMessage(answer, true);
+                            const parsed = parseRouteRequest(answer);
+                            if (!parsed.ships.length) {
+                                addMessage('Dieses Schiff konnte ich nicht sicher zuordnen. Unser Team kann es gern persönlich prüfen.');
+                                setActions('Wie möchtest du weitergehen?', [
+                                    { label:'Anderes Schiff auswählen', run:() => askForShip(criteria, mode) },
+                                    { label:'Ohne Wunschschiff weiter', run:() => guideSearch(criteria, mode) },
+                                    { label:'Persönlich prüfen lassen', run:() => finishWithContact('Ich halte dein Wunschschiff fest; unser Team prüft die passende Route gern persönlich.') }
+                                ]);
+                                return;
+                            }
+                            guideSearch({ ...criteria, ships:parsed.ships }, mode);
+                        }
+                    )
+                });
+                choices.push({ label:'Schiff ist mir offen', run:() => guideSearch(criteria, mode) });
+                setActions('Schiff auswählen', addShowResultsChoice(choices, criteria));
+            }
+
+            function summarizeGuidedSearch(criteria, matches, mode) {
+                const normalized = normalizeCriteria(criteria);
+                advisorState.criteria = normalized;
+                const nights = getDistinctNights(matches);
+                const durationHint = !normalized.durations.length && normalized.exactNights === null && nights.length === 1
+                    ? ' Alle passenden Routen dauern ' + nights[0] + ' Nächte.'
+                    : '';
+                const prefix = mode === 'current'
+                    ? 'Deine aktuelle Suche ist jetzt sinnvoll eingegrenzt.'
+                    : 'Damit ist die Suche gut eingegrenzt.';
+                addMessage(prefix + ' Ich finde ' + matches.length + ' gelistete ' + (matches.length === 1 ? 'Route.' : 'Routen.') + durationHint);
+                setActions('Wie möchtest du weitergehen?', [
+                    { label:'Passende Routen anzeigen', run:() => showChatSearch(normalized) },
+                    { label:'Weitere Wünsche nennen', run:() => askForOfferDetails(normalized, false) },
+                    { label:'Persönliches Angebot vorbereiten', run:() => askForOfferDetails(normalized, true) }
+                ]);
+            }
+
+            function inferSingleRegion(criteria) {
+                const provisional = getMatchingChatRoutes(criteria);
+                const regions = unique(provisional.map(match => match.route.region));
+                return regions.length === 1 ? regions[0] : '';
+            }
+
+            function guideSearch(criteria, mode = 'guided') {
+                let normalized = normalizeCriteria(criteria);
+                advisorState.criteria = normalized;
+
+                if (!normalized.regions.length) {
+                    const inferredRegion = (normalized.ports.length || normalized.ships.length) ? inferSingleRegion(normalized) : '';
+                    if (inferredRegion) {
+                        normalized = normalizeCriteria({ ...normalized, regions:[inferredRegion], regionLabel:inferredRegion });
+                        addMessage('Auf Basis deiner bisherigen Angaben liegt die passende Route im ' + inferredRegion + '.');
                     } else {
-                        addMessage(`Für${description ? ` ${description}` : ' diese Suche'} finde ich aktuell weder exakte noch ähnliche Routen. Unser Team kann gern weitere Termine oder Alternativen prüfen.`);
-                        setActions('Wie möchtest du weitergehen?', [
-                            { label:'Suche anders formulieren', run:askForRouteQuery },
-                            { label:'Persönliche Alternativen anfragen', run:() => finishWithContact('Wir suchen gern persönlich nach einer passenden Alternative.') },
-                            { label:'Neue Suche starten', run:startRouteFinder }
-                        ]);
+                        askForDestination(normalized, mode);
+                        return;
                     }
                 }
+
+                if (!normalized.startDate) {
+                    askForTravelTime(normalized, mode);
+                    return;
+                }
+
+                const matches = getMatchingChatRoutes(normalized);
+                if (!matches.length) {
+                    offerNoResults(normalized, mode);
+                    return;
+                }
+
+                const durationValues = getDistinctDurationValues(matches);
+                if (!normalized.durations.length && normalized.exactNights === null && durationValues.length > 1) {
+                    askForDuration(normalized, mode);
+                    return;
+                }
+
+                const ports = getDistinctPorts(matches);
+                if (!normalized.ports.length && ports.length > 1) {
+                    askForPort(normalized, mode);
+                    return;
+                }
+
+                const ships = getDistinctShips(matches);
+                if (!normalized.ships.length && ships.length > 1) {
+                    askForShip(normalized, mode);
+                    return;
+                }
+
+                summarizeGuidedSearch(normalized, matches, mode);
+            }
+
+            function isShipInformationQuestion(query) {
+                const text = normalizeChatText(query);
+                return /\b(?:wie|infos?|information|erzahl|erzahle|erzaehl|beschreib|bietet|an bord|was kann)\b/.test(text);
+            }
+
+            function showShipInformation(ship, criteria) {
+                const profile = shipInfoByShip[ship] || routesData.find(route => route.schiff === ship)?.shipInfo;
+                const shipRoutes = routesData.filter(route => route.schiff === ship);
+                const regions = unique(shipRoutes.map(route => route.region));
+                const routeHint = shipRoutes.length
+                    ? ' In den hinterlegten Routen fährt sie derzeit im ' + joinNaturally(regions) + '.'
+                    : ' Zu diesem Schiff sind aktuell keine Route und keine Termine in der Suche hinterlegt.';
+                addMessage(ship + ': ' + (profile || 'Zu diesem Schiff liegt mir eine Routenbezeichnung, aber keine nähere Beschreibung vor.') + routeHint);
+                setActions('Wie darf ich helfen?', [
+                    { label:'Reisen mit ' + ship + ' zeigen', run:() => showChatSearch({ ...criteria, ships:[ship] }) },
+                    { label:'Wunsch weiter eingrenzen', run:() => guideSearch({ ...criteria, ships:[ship] }, 'guided') },
+                    { label:'Persönlich beraten lassen', run:() => finishWithContact('Ich halte dein Wunschschiff fest; unser Team stellt dir gern die passende Reise zusammen.') }
+                ]);
+            }
+
+            function rememberParsedDetails(parsed, rawAnswer) {
+                if (parsed.party) advisorState.party = parsed.party;
+                if (parsed.preferences.length) advisorState.preferences = parsed.preferences;
+                if (rawAnswer) advisorState.details = rawAnswer;
             }
 
             function askForRouteQuery() {
                 askForText(
-                    'Schreib deinen Wunsch einfach so, wie du ihn sagen würdest – zum Beispiel: „Karibik Mai 2027 mit der World America“.',
-                    'Reiseziel, Monat/Jahr, Schiff …',
+                    'Schreib deinen Wunsch einfach so, wie du ihn sagen würdest – zum Beispiel: „Mittelmeer im September 2027, 7 Nächte, ab Barcelona“ oder „MSC World Asia“.',
+                    'Reiseziel, Zeitraum, Schiff, Hafen …',
                     answer => {
                         if (!answer) {
-                            addMessage('Bitte nenne mindestens ein Reiseziel, einen Zeitraum oder ein Schiff.', true);
+                            addMessage('Bitte nenne mindestens ein Reiseziel, einen Zeitraum, einen Abfahrtshafen oder ein Schiff.', true);
                             askForRouteQuery();
                             return;
                         }
                         addMessage(answer, true);
-                        const criteria = parseRouteRequest(answer);
-                        if (!criteria.region && !criteria.regions?.length && !criteria.ship && !criteria.startDate) {
-                            advisorState.details = answer;
-                            addMessage('Ich habe den Wunsch notiert. Damit ich ihn exakt einordnen kann, hilft mir noch ein Reiseziel, ein Monat/Jahr oder ein Schiff.');
-                            setActions('Was passt?', [
-                                { label:'Karibik', run:() => showChatSearch({ ...criteria, region:'Karibik & Antillen' }) },
-                                { label:'Mittelmeer', run:() => showChatSearch({ ...criteria, region:'Mittelmeer' }) },
-                                { label:'Persönlich beraten lassen', run:() => finishWithContact('Wir klären deine Wünsche gern direkt persönlich mit dir.') }
+                        const parsed = parseRouteRequest(answer);
+                        rememberParsedDetails(parsed, answer);
+                        const hasRouteSignal = parsed.regions.length || parsed.ports.length || parsed.ships.length || parsed.durations.length || parsed.exactNights !== null || parsed.startDate;
+                        if (!hasRouteSignal) {
+                            addMessage('Ich habe deinen Wunsch notiert. Für eine Routensuche brauche ich noch mindestens ein Ziel, einen Zeitraum, einen Abfahrtshafen oder ein Schiff.');
+                            setActions('Wie möchtest du starten?', [
+                                { label:'Ziel auswählen', run:() => askForDestination(emptyCriteria(), 'guided') },
+                                { label:'Zeitraum nennen', run:() => askForTravelTime(emptyCriteria(), 'guided') },
+                                { label:'Persönlich beraten lassen', run:() => finishWithContact('Wir klären deinen Wunsch gern persönlich und ohne Zeitdruck.') }
                             ]);
                             return;
                         }
-                        showChatSearch(criteria);
+                        if (parsed.ships.length === 1 && isShipInformationQuestion(answer)) {
+                            showShipInformation(parsed.ships[0], parsed);
+                            return;
+                        }
+
+                        // Ein eindeutig genanntes Schiff darf direkt gesucht werden.
+                        // Das ist besonders wichtig für MSC World Asia: Der Name
+                        // wird nie als Region Asien weiterverarbeitet.
+                        if (parsed.ships.length) {
+                            showChatSearch(parsed);
+                            return;
+                        }
+                        if (parsed.regions.length && parsed.startDate) {
+                            showChatSearch(parsed);
+                            return;
+                        }
+                        guideSearch(parsed, 'guided');
                     }
                 );
             }
 
+            function startGuidedDestinationSearch(criteria) {
+                advisorState.goal = 'Ich möchte eine passende Kreuzfahrtroute finden';
+                const normalized = normalizeCriteria(criteria);
+                const destination = normalized.regionLabel || joinNaturally(normalized.regions);
+                addMessage((destination || 'Diese Route') + ' – schöne Wahl. Ich frage nur nach Kriterien, die deine Auswahl wirklich verändern.');
+                guideSearch(normalized, 'guided');
+            }
+
+            function startRouteFinder() {
+                advisorState.goal = 'Ich möchte eine passende Kreuzfahrtroute finden';
+                addMessage('Ich finde passende Routen direkt in der Suche. Du kannst ein Ziel auswählen oder deinen Wunsch frei formulieren.');
+                const regionChoices = [...document.querySelectorAll('#regionChips .chip')]
+                    .map(chip => ({
+                        label:chip.textContent.trim(),
+                        run:() => startGuidedDestinationSearch({ regions:[chip.dataset.value], regionLabel:chip.textContent.trim() })
+                    }));
+                regionChoices.push({ label:'Freitext-Suche starten', run:askForRouteQuery });
+                regionChoices.push({ label:'Lieber persönlich beraten', run:() => askForOfferDetails(emptyCriteria(), true) });
+                setActions('Route suchen', regionChoices);
+            }
+
             function buildContactMessage() {
                 const parts = ['Hallo Core Cruises, ich wünsche eine persönliche Beratung zu einer Kreuzfahrtroute.'];
-                if (advisorState.goal) parts.push(`Anliegen: ${advisorState.goal}.`);
-                if (advisorState.priority) parts.push(`Besonders wichtig: ${advisorState.priority}.`);
-                if (advisorState.focusRoute) parts.push(`Interessante Route: ${advisorState.focusRoute.title} (${advisorState.focusRoute.schiff}, ab ${advisorState.focusRoute.startPort}, ${advisorState.focusRoute.nights} Nächte).`);
-                if (advisorState.favoriteTitles?.length) parts.push(`Gespeicherte Favoriten: ${advisorState.favoriteTitles.join(', ')}.`);
-                const filters = getFilterSummary();
-                if (filters.length) parts.push(`Aktuelle Suche: ${filters.join('; ')}.`);
-                if (advisorState.details) parts.push(`Weitere Wünsche: ${advisorState.details}`);
+                if (advisorState.goal) parts.push('Anliegen: ' + advisorState.goal + '.');
+                if (advisorState.focusRoute) {
+                    parts.push('Interessante Route: ' + advisorState.focusRoute.title + ' (' + advisorState.focusRoute.schiff + ', ab ' + advisorState.focusRoute.startPort + ', ' + advisorState.focusRoute.nights + ' Nächte).');
+                }
+                if (advisorState.favoriteTitles?.length) parts.push('Gespeicherte Favoriten: ' + advisorState.favoriteTitles.join(', ') + '.');
+                const criteria = advisorState.criteria || getCurrentSearchCriteria();
+                const description = describeCriteria(criteria);
+                if (description) parts.push('Gewünschte Suche: ' + description + '.');
+                const original = advisorState.originalCriteria ? describeCriteria(advisorState.originalCriteria) : '';
+                if (original && original !== description) parts.push('Ursprünglicher Wunsch: ' + original + '.');
+                if (advisorState.party) parts.push('Reisegruppe: ' + advisorState.party + '.');
+                if (advisorState.preferences?.length) parts.push('Wichtig ist: ' + joinNaturally(advisorState.preferences, 'und') + '.');
+                if (advisorState.details) parts.push('Weitere Wünsche: ' + advisorState.details + '.');
                 return parts.join('\n');
             }
 
             function refreshContactLinks() {
                 const message = buildContactMessage();
                 const subject = advisorState.focusRoute
-                    ? `Beratung zur Route: ${advisorState.focusRoute.title}`
+                    ? 'Beratung zur Route: ' + advisorState.focusRoute.title
                     : 'Persönliche Kreuzfahrtberatung';
-                whatsapp.href = `https://wa.me/${MY_PHONE_NUMBER}?text=${encodeURIComponent(message)}`;
-                mail.href = `mailto:${MY_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+                whatsapp.href = 'https://wa.me/' + MY_PHONE_NUMBER + '?text=' + encodeURIComponent(message);
+                mail.href = 'mailto:' + MY_EMAIL + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(message);
             }
 
             function finishWithContact(nextStep) {
                 refreshContactLinks();
-                addMessage(`${nextStep}\n\nIch habe die Angaben für deine Anfrage vorbereitet. Wähle jetzt einfach WhatsApp oder E-Mail – unser Team stellt dir passende Routen persönlich zusammen.`);
+                addMessage(nextStep + '\n\nIch habe die Angaben für deine Anfrage vorbereitet. Wähle jetzt einfach WhatsApp oder E-Mail – unser Team prüft passende Routen und Termine persönlich.');
                 setActions('Wie möchtest du weitergehen?', [
-                    { label: 'Beratung neu starten', run: startConversation }
+                    { label:'Beratung neu starten', run:startConversation }
                 ]);
             }
 
-            function askForWishDetails() {
+            function askForOfferDetails(criteria, finishAfterAnswer = true) {
+                advisorState.criteria = normalizeCriteria(criteria);
                 askForText(
-                    'Magst du mir noch Reisezeit, Personenzahl, Abfahrtshafen oder einen besonderen Wunsch nennen? Du kannst auch „ohne weitere Wünsche“ schreiben.',
-                    'z. B. August 2027, 2 Erwachsene, ab Hamburg',
+                    'Für ein persönliches Angebot: Mit wie vielen Personen reist du, gibt es Kinder oder einen Kabinen-, Anreise- oder besonderen Wunsch? Diese Angaben verändern nicht die angezeigten Routen, helfen unserem Team aber bei der Beratung.',
+                    'z. B. 2 Erwachsene, Balkon, Anreise ab Hamburg',
                     answer => {
-                        advisorState.details = answer || 'Keine weiteren Angaben';
-                        addMessage(advisorState.details, true);
-                        finishWithContact('Sehr gut – damit können wir gezielter für dich suchen.');
+                        const parsed = parseRouteRequest(answer);
+                        rememberParsedDetails(parsed, answer || 'Keine weiteren Angaben');
+                        addMessage(answer || 'Keine weiteren Angaben', true);
+                        if (finishAfterAnswer) {
+                            finishWithContact('Sehr gut – damit kann unser Team gezielter beraten.');
+                        } else {
+                            refreshContactLinks();
+                            addMessage('Danke, ich habe deinen Wunsch für die Beratung notiert.');
+                            setActions('Wie möchtest du weitergehen?', [
+                                { label:'Passende Routen anzeigen', run:() => showChatSearch(advisorState.criteria) },
+                                { label:'Persönliches Angebot vorbereiten', run:() => finishWithContact('Ich habe alle Angaben für die persönliche Beratung vorbereitet.') }
+                            ]);
+                        }
                     }
                 );
             }
 
-            function askForRoutePriority() {
-                addMessage('Worauf soll ich bei deiner Route zuerst achten?');
-                setActions('Deine Priorität', [
-                    { label: 'Reiseziel / Route', run: () => { advisorState.priority = 'ein passendes Reiseziel und eine schöne Route'; askForWishDetails(); } },
-                    { label: 'Reisezeitraum', run: () => { advisorState.priority = 'der passende Reisezeitraum'; askForWishDetails(); } },
-                    { label: 'Reisedauer', run: () => { advisorState.priority = 'die ideale Reisedauer'; askForWishDetails(); } },
-                    { label: 'Passendes Schiff', run: () => { advisorState.priority = 'ein passendes Schiff und Bord-Erlebnis'; askForWishDetails(); } }
-                ]);
-            }
-
-            function askForGuidedShip(criteria) {
-                const regions = getCriteriaRegions(criteria);
-                const ships = [...new Set(routesData
-                    .filter(route => (!regions.length || regions.includes(route.region)) && (!criteria.duration || (() => {
-                        const duration = allDurationsList.find(option => option.value === criteria.duration);
-                        return duration && route.nights >= duration.min && route.nights <= duration.max;
-                    })()))
-                    .map(route => route.schiff))]
-                    .slice(0, 3);
-
-                addMessage('Gibt es ein Wunschschiff? Falls nicht, zeige ich dir alle passenden Schiffe.');
-                setActions('Schiff auswählen', [
-                    ...ships.map(ship => ({ label:ship, run:() => showChatSearch({ ...criteria, ship }) })),
-                    { label:'Alle passenden Schiffe', run:() => showChatSearch(criteria) },
-                    { label:'Schiff frei eingeben', run:() => askForText(
-                        'Wie heißt dein Wunschschiff?',
-                        'z. B. World America',
-                        answer => {
-                            if (!answer) { askForGuidedShip(criteria); return; }
-                            addMessage(answer, true);
-                            const requestedShip = parseRouteRequest(answer).ship;
-                            if (requestedShip) showChatSearch({ ...criteria, ship:requestedShip, usedFuzzyMatch:normalizeChatQuery(answer) !== normalizeChatQuery(requestedShip) });
-                            else {
-                                advisorState.details = `Wunschschiff: ${answer}`;
-                                finishWithContact('Ich konnte das Schiff nicht sicher zuordnen. Unser Team prüft es gern persönlich für dich.');
-                            }
-                        }
-                    )}
-                ]);
-            }
-
-            function askForGuidedDuration(criteria) {
-                addMessage('Wie lange möchtest du ungefähr unterwegs sein?');
-                setActions('Gewünschte Reisedauer', [
-                    ...allDurationsList.map(option => ({ label:option.label, run:() => askForGuidedShip({ ...criteria, duration:option.value }) })),
-                    { label:'Bei der Dauer bin ich offen', run:() => askForGuidedShip(criteria) }
-                ]);
-            }
-
-            function askForGuidedTravelTime(criteria) {
-                addMessage('Wann möchtest du ungefähr reisen? Danach frage ich dich noch nach Reisedauer und Wunschschiff.');
-                setActions('Gewünschter Zeitraum', [
-                    { label:'Im Jahr 2027', run:() => askForGuidedDuration({ ...criteria, startDate:'2027-01-01', endDate:'2027-12-31' }) },
-                    { label:'Im Jahr 2028', run:() => askForGuidedDuration({ ...criteria, startDate:'2028-01-01', endDate:'2028-12-31' }) },
-                    { label:'Zeitraum noch offen', run:() => askForGuidedDuration(criteria) },
-                    { label:'Monat oder Zeitraum eingeben', run:() => askForText(
-                        'Nenne einfach Monat und Jahr, zum Beispiel „Mai 2027“.',
-                        'z. B. Mai 2027',
-                        answer => {
-                            if (!answer) { askForGuidedTravelTime(criteria); return; }
-                            addMessage(answer, true);
-                            const parsed = parseRouteRequest(answer);
-                            askForGuidedDuration({ ...criteria, startDate:parsed.startDate, endDate:parsed.endDate });
-                        }
-                    )}
-                ]);
-            }
-
-            function startGuidedDestinationSearch(criteria) {
-                advisorState.goal = 'Ich möchte eine passende Kreuzfahrtroute finden';
-                const destination = criteria.regionLabel || getCriteriaRegions(criteria).join(' oder ');
-                addMessage(`${destination} – schöne Wahl. Ich grenze die passenden Routen jetzt Schritt für Schritt für dich ein.`);
-                askForGuidedTravelTime(criteria);
-            }
-
-            function startRouteFinder() {
-                advisorState.goal = 'Ich möchte eine passende Kreuzfahrtroute finden';
-                addMessage('Ich suche jetzt direkt in unserer Kreuzfahrtsuche für dich. Wähle ein Ziel oder gib deinen Wunsch als Freitext ein – die passenden Routen erscheinen anschließend auf der Seite.');
-                setActions('Route suchen', [
-                    { label: 'Karibik auswählen', run: () => startGuidedDestinationSearch({ region:'Karibik & Antillen', ship:'', startDate:'', endDate:'' }) },
-                    { label: 'Mittelmeer auswählen', run: () => startGuidedDestinationSearch({ region:'Mittelmeer', ship:'', startDate:'', endDate:'' }) },
-                    { label: 'Nordeuropa auswählen', run: () => startGuidedDestinationSearch({ region:'Nordeuropa', ship:'', startDate:'', endDate:'' }) },
-                    { label: 'Weltreise auswählen', run: () => startGuidedDestinationSearch({ regions:['World Cruise', 'MSC Grand Voyages'], regionLabel:'Weltreise & lange Reisen', ship:'', startDate:'', endDate:'' }) },
-                    { label: 'Freitext-Suche starten', run: askForRouteQuery },
-                    { label: 'Lieber persönlich beraten', run: askForRoutePriority }
-                ]);
+            function askForFavoriteAdvice(favorites) {
+                const visibleFavorites = favorites.slice(0, 6);
+                const choices = visibleFavorites.map(route => ({
+                    label:route.schiff + ' ab ' + route.startPort,
+                    run:() => {
+                        advisorState.focusRoute = route;
+                        advisorState.criteria = normalizeCriteria({
+                            regions:[route.region],
+                            ports:[route.startPort],
+                            ships:[route.schiff],
+                            durations:[getDurationForNights(route.nights)],
+                            exactNights:route.nights
+                        });
+                        finishWithContact('Wir beraten dich gern zu „' + route.title + '“ und passenden Alternativen.');
+                    }
+                }));
+                choices.push({
+                    label:'Favoriten vergleichen',
+                    run:() => finishWithContact('Wir vergleichen deine Favoriten gern hinsichtlich Route, Schiff, Abfahrtshafen und Reisedauer.')
+                });
+                choices.push({ label:'Andere Routen finden', run:startRouteFinder });
+                setActions('Favorit auswählen oder vergleichen', choices);
             }
 
             function checkFavorites() {
@@ -6873,31 +7529,45 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 if (!favorites.length) {
                     addMessage('Du hast aktuell noch keine gespeicherten Favoriten. Ich helfe dir gern, die Auswahl einzugrenzen.');
                     setActions('Wie möchtest du weitergehen?', [
-                        { label: 'Route finden', run: startRouteFinder },
-                        { label: 'Aktuelle Suche beraten', run: adviseCurrentSearch }
+                        { label:'Route finden', run:startRouteFinder },
+                        { label:'Aktuelle Suche beraten', run:adviseCurrentSearch }
                     ]);
                     return;
                 }
-                const names = favorites.slice(0, 2).map(route => `„${route.title}“`).join(' und ');
-                const more = favorites.length > 2 ? ` sowie ${favorites.length - 2} weitere` : '';
-                addMessage(`Du hast ${favorites.length} Favorit${favorites.length === 1 ? '' : 'en'} gespeichert: ${names}${more}.`);
-                setActions('Was soll ich für dich vorbereiten?', [
-                    { label: 'Routen vergleichen', run: () => finishWithContact('Wir vergleichen deine Favoriten gern hinsichtlich Route, Schiff, Abfahrtshafen und Reisedauer.') },
-                    { label: 'Eine Route beraten', run: () => { advisorState.focusRoute = favorites[0]; finishWithContact(`Wir beraten dich gern persönlich zu „${advisorState.focusRoute.title}“ und passenden Alternativen.`); } },
-                    { label: 'Andere Routen finden', run: startRouteFinder }
-                ]);
+                const names = favorites.slice(0, 2).map(route => '„' + route.title + '“').join(' und ');
+                const more = favorites.length > 2 ? ' sowie ' + (favorites.length - 2) + ' weitere' : '';
+                addMessage('Du hast ' + favorites.length + ' Favorit' + (favorites.length === 1 ? '' : 'en') + ' gespeichert: ' + names + more + '.');
+                askForFavoriteAdvice(favorites);
             }
 
             function adviseCurrentSearch() {
                 advisorState.goal = 'Ich möchte die aktuelle Routensuche beraten lassen';
-                const filters = getFilterSummary();
-                if (filters.length) {
-                    addMessage(`Ich sehe deine aktuelle Suche: ${filters.join(' · ')}.`);
-                    askForWishDetails();
-                } else {
+                const criteria = getCurrentSearchCriteria();
+                advisorState.criteria = criteria;
+                const hasSearch = criteria.regions.length || criteria.ports.length || criteria.ships.length || criteria.durations.length || criteria.exactNights !== null || criteria.startDate || criteria.endDate;
+                if (!hasSearch) {
                     addMessage('Du hast noch keine Suchkriterien gewählt. Kein Problem – wir finden sie gemeinsam.');
                     startRouteFinder();
+                    return;
                 }
+
+                const description = describeCriteria(criteria);
+                const matches = getMatchingChatRoutes(criteria);
+                let message = 'Ich sehe deine aktuelle Suche: ' + description + '.';
+                if (matches.length) {
+                    const nights = getDistinctNights(matches);
+                    if (!criteria.durations.length && criteria.exactNights === null && nights.length === 1) {
+                        message += ' In diesem Rahmen dauern alle ' + matches.length + ' gelisteten Routen ' + nights[0] + ' Nächte – nach der Reisezeit oder Dauer frage ich deshalb nicht noch einmal.';
+                    } else {
+                        message += ' Dazu passen aktuell ' + matches.length + ' gelistete ' + (matches.length === 1 ? 'Route.' : 'Routen.');
+                    }
+                    addMessage(message);
+                    guideSearch(criteria, 'current');
+                    return;
+                }
+
+                addMessage(message + ' Für diese Kombination finde ich aktuell keine gelistete Route.');
+                offerNoResults(criteria, 'current');
             }
 
             function requestCallback() {
@@ -6919,20 +7589,38 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 const sharedRoute = getSharedRoute();
                 if (sharedRoute) {
                     advisorState.focusRoute = sharedRoute;
-                    addMessage(`Du schaust dir gerade „${sharedRoute.title}“ an. Soll ich dir diese Route persönlich einordnen oder ähnliche Optionen heraussuchen?`);
+                    advisorState.criteria = normalizeCriteria({
+                        regions:[sharedRoute.region],
+                        ports:[sharedRoute.startPort],
+                        ships:[sharedRoute.schiff],
+                        durations:[getDurationForNights(sharedRoute.nights)],
+                        exactNights:sharedRoute.nights
+                    });
+                    addMessage('Du schaust dir gerade „' + sharedRoute.title + '“ an. Soll ich diese Route einordnen oder ähnliche Optionen suchen?');
                     setActions('Ich kann sofort helfen', [
-                        { label: 'Diese Route beraten', run: () => { advisorState.goal = 'Beratung zu einer konkreten Route'; finishWithContact(`Wir beraten dich gern zu „${sharedRoute.title}“ und prüfen passende Reisetermine.`); } },
-                        { label: 'Ähnliche Routen finden', run: startRouteFinder },
-                        { label: 'Meine Favoriten ansehen', run: checkFavorites }
+                        { label:'Diese Route beraten', run:() => { advisorState.goal = 'Beratung zu einer konkreten Route'; finishWithContact('Wir beraten dich gern zu „' + sharedRoute.title + '“ und prüfen passende Reisetermine.'); } },
+                        { label:'Ähnliche Routen finden', run:() => guideSearch({ ...advisorState.criteria, ships:[] }, 'guided') },
+                        { label:'Meine Favoriten ansehen', run:checkFavorites }
                     ]);
                 } else {
-                    addMessage('Hallo, ich bin dein digitaler Reiseassistent von Core Cruises. Ich kann dir passende Routen direkt in der Suche anzeigen oder deine Anfrage für unser Beratungsteam vorbereiten.');
-                    setActions('Wobei darf ich helfen?', [
-                        { label: 'Routen direkt suchen', run: startRouteFinder },
-                        { label: 'Meine Favoriten prüfen', run: checkFavorites },
-                        { label: 'Aktuelle Suche beraten', run: adviseCurrentSearch },
-                        { label: 'Rückruf anfragen', run: requestCallback }
-                    ]);
+                    const criteria = getCurrentSearchCriteria();
+                    const hasSearch = criteria.regions.length || criteria.ports.length || criteria.ships.length || criteria.durations.length || criteria.exactNights !== null || criteria.startDate || criteria.endDate;
+                    if (hasSearch) {
+                        addMessage('Hallo, ich bin dein digitaler Reiseassistent von Core Cruises. Deine Suche ist bereits eingestellt – ich kann sie gezielt weiter verfeinern, ohne vorhandene Filter zu verlieren.');
+                        setActions('Wobei darf ich helfen?', [
+                            { label:'Aktuelle Suche beraten', run:adviseCurrentSearch },
+                            { label:'Neue Route finden', run:startRouteFinder },
+                            { label:'Meine Favoriten prüfen', run:checkFavorites },
+                            { label:'Rückruf anfragen', run:requestCallback }
+                        ]);
+                    } else {
+                        addMessage('Hallo, ich bin dein digitaler Reiseassistent von Core Cruises. Ich finde passende Routen direkt in der Suche oder bereite deine Anfrage für unser Beratungsteam vor.');
+                        setActions('Wobei darf ich helfen?', [
+                            { label:'Routen direkt suchen', run:startRouteFinder },
+                            { label:'Meine Favoriten prüfen', run:checkFavorites },
+                            { label:'Rückruf anfragen', run:requestCallback }
+                        ]);
+                    }
                 }
                 refreshContactLinks();
             }
@@ -6956,6 +7644,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
             startConversation();
             window.setTimeout(() => setOpen(true), 1000);
         })();
+
     </script>
 </body>
 </html>
