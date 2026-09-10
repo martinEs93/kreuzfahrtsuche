@@ -362,7 +362,7 @@
             <div class="filter-card">
                 <!-- 1. Region -->
                 <div class="filter-group">
-                    <label>Region auswählen<span class="required-asterisk">*</span>:</label>
+                    <label>Region auswählen:</label>
                     <div class="chips-container" id="regionChips">
                         <div class="chip" data-value="Mittelmeer">Mittelmeer</div>
                         <div class="chip" data-value="Nordeuropa">Nordeuropa</div>
@@ -379,7 +379,7 @@
 
                 <!-- 2. Datum -->
                 <div class="filter-group" style="margin-top:20px;">
-                    <label>Gewünschter Reisezeitraum<span class="required-asterisk">*</span>:</label>
+                    <label>Gewünschter Reisezeitraum:</label>
                     <div class="date-range-container">
                         <div class="date-input-wrapper">
                             <span>Von:</span>
@@ -5715,8 +5715,9 @@
             }
         }
 
-        document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", () => {
    initChips();
+   updatePortFilter();
    updateAvailableFilterOptions();
    renderRoutes();
 
@@ -5868,27 +5869,28 @@ endDateInput.addEventListener('change', handleDateUpdate);
             const group = document.getElementById('portFilterGroup');
             const portDrop = document.getElementById('portDropdown');
 
-            if (selectedRegions.length === 0) {
-                group.style.display = 'none';
-                selectedPorts = [];
-                return;
-            }
-
             group.style.display = 'block';
             portDrop.innerHTML = '';
 
-            selectedRegions.forEach(reg => {
+            // Ohne Region darf auch ein Hafen allein die Suche eingrenzen.
+            // Sobald Regionen gewählt werden, zeigt der Filter weiterhin nur
+            // die dazu passenden Abfahrtshäfen.
+            const portGroups = selectedRegions.length
+                ? selectedRegions.map(region => ({ label:region, region }))
+                : [{ label:'Alle Regionen', region:'' }];
+
+            portGroups.forEach(({ label:groupLabel, region }) => {
                 // Die Hafenauswahl wird aus den tatsächlichen Routendaten erzeugt.
                 // So bleiben auch Häfen mit abweichender Schreibweise oder neu
                 // hinzugekommene Häfen im Filter und im Concierge verfügbar.
                 const ports = [...new Set(routesData
-                    .filter(route => route.region === reg)
+                    .filter(route => !region || route.region === region)
                     .map(route => route.startPort))]
                     .sort((a, b) => a.localeCompare(b, 'de'));
                 if (ports.length > 0) {
                     const header = document.createElement('div');
                     header.className = 'dropdown-group-header';
-                    header.textContent = reg;
+                    header.textContent = groupLabel;
                     portDrop.appendChild(header);
 
                     ports.forEach(port => {
@@ -5901,13 +5903,13 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 }
             });
 
-            selectedPorts = Array.from(portDrop.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value);
+            selectedPorts = [...new Set(Array.from(portDrop.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.value))];
             document.getElementById('portSelectText').textContent = selectedPorts.length > 0 ? `${selectedPorts.length} Hafen/Häfen gewählt` : 'Alle Häfen';
         }
 
         function handlePortChange() {
             startNewSearch();
-            selectedPorts = Array.from(document.querySelectorAll('#portDropdown input[type="checkbox"]:checked')).map(cb => cb.value);
+            selectedPorts = [...new Set(Array.from(document.querySelectorAll('#portDropdown input[type="checkbox"]:checked')).map(cb => cb.value))];
             document.getElementById('portSelectText').textContent = selectedPorts.length > 0 ? `${selectedPorts.length} Hafen/Häfen gewählt` : 'Alle Häfen';
             renderRoutes();
         }
@@ -5939,8 +5941,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
 
             document.getElementById('endDate').min = getTodayISO();
 
-            document.getElementById('portFilterGroup').style.display = 'none';
-
+            updatePortFilter();
             updateAvailableFilterOptions();
             renderRoutes();
         }
@@ -5948,7 +5949,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
         function getValidDepartures(route, startVal, endVal) {
             return route.departures.filter(dep => {
                 if (!isUpcomingDeparture(dep)) return false;
-                if (dep.start < startVal) return false;
+                if (startVal && dep.start < startVal) return false;
                 if (endVal && dep.end > endVal) return false;
                 return true;
             });
@@ -6020,10 +6021,20 @@ endDateInput.addEventListener('change', handleDateUpdate);
             const startVal = isFavoritesView ? '' : document.getElementById('startDate').value;
             const endVal = isFavoritesView ? '' : document.getElementById('endDate').value;
 
-            // Pflichtfilter prüfen: mindestens 1 Region UND mindestens Startdatum (Von)
-            if (!isSharedRoute && !isFavoritesView && (selectedRegions.length === 0 || !startVal)) {
+            // Erst ohne jede Einschränkung bleibt die Ergebnisliste bewusst leer.
+            // Jede einzelne Filterart – auch nur Schiff, Dauer oder Datum –
+            // genügt für eine gezielte Routensuche.
+            const hasAnySearchFilter =
+                selectedRegions.length > 0 ||
+                selectedPorts.length > 0 ||
+                selectedShips.length > 0 ||
+                selectedDurations.length > 0 ||
+                chatExactNights !== null ||
+                Boolean(startVal) ||
+                Boolean(endVal);
+            if (!isSharedRoute && !isFavoritesView && !hasAnySearchFilter) {
                 updateResultsToolbar(0, false);
-                grid.innerHTML = '<div class="no-results">Bitte wähle mindestens eine Region und das früheste Abreisedatum aus, um passende Routen angezeigt zu bekommen.</div>';
+                grid.innerHTML = '<div class="no-results">Setze mindestens einen Filter, um passende Kreuzfahrten angezeigt zu bekommen.</div>';
                 return;
             }
 
@@ -6034,8 +6045,10 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 // Favoriten werden unabhängig von den derzeit gesetzten Suchfiltern angezeigt.
                 if (isFavoritesView) return favoriteRouteIds.has(route.id);
 
-                // Region Filter
-                if (!selectedRegions.includes(route.region)) return false;
+                // Region ist nur dann eine Bedingung, wenn mindestens eine
+                // Region ausgewählt wurde. So funktionieren auch reine
+                // Schiffs-, Dauer- oder Datumssuchen.
+                if (selectedRegions.length > 0 && !selectedRegions.includes(route.region)) return false;
 
                 // Port Filter
                 if (selectedPorts.length > 0 && !selectedPorts.includes(route.startPort)) return false;
@@ -6056,7 +6069,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 // nicht unbemerkt auf den UI-Bereich „6–7 Nächte“ verbreitern.
                 if (chatExactNights !== null && route.nights !== chatExactNights) return false;
 
-                // Date Filter (Startdatum muss gewählt sein, Enddatum ist optional)
+                // Datumsfilter: „Von“ und „Bis“ können jeweils einzeln gesetzt sein.
                 if (getValidDepartures(route, startVal, endVal).length === 0) return false;
 
                 return true;
@@ -7617,6 +7630,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
                         addMessage('Hallo, ich bin dein digitaler Reiseassistent von Core Cruises. Ich finde passende Routen direkt in der Suche oder bereite deine Anfrage für unser Beratungsteam vor.');
                         setActions('Wobei darf ich helfen?', [
                             { label:'Routen direkt suchen', run:startRouteFinder },
+                            { label:'Aktuelle Suche beraten', run:adviseCurrentSearch },
                             { label:'Meine Favoriten prüfen', run:checkFavorites },
                             { label:'Rückruf anfragen', run:requestCallback }
                         ]);
