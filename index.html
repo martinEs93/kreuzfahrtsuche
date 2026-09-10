@@ -5584,6 +5584,10 @@
             renderRoutes();
         }
 
+        function startNewSearch() {
+            showingFavorites = false;
+        }
+
         document.addEventListener("DOMContentLoaded", () => {
    initChips();
    updateAvailableFilterOptions();
@@ -5611,6 +5615,7 @@ function syncDateConstraints() {
 }
 
 function handleDateUpdate() {
+    startNewSearch();
     syncDateConstraints();
     updateAvailableFilterOptions();
     renderRoutes();
@@ -5643,6 +5648,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
             const container = document.getElementById('regionChips');
             container.querySelectorAll('.chip').forEach(chip => {
                 chip.addEventListener('click', () => {
+                    startNewSearch();
                     chip.classList.toggle('active');
                     const val = chip.dataset.value;
                     if (selectedRegions.includes(val)) {
@@ -5769,24 +5775,28 @@ endDateInput.addEventListener('change', handleDateUpdate);
         }
 
         function handlePortChange() {
+            startNewSearch();
             selectedPorts = Array.from(document.querySelectorAll('#portDropdown input[type="checkbox"]:checked')).map(cb => cb.value);
             document.getElementById('portSelectText').textContent = selectedPorts.length > 0 ? `${selectedPorts.length} Hafen/Häfen gewählt` : 'Alle Häfen';
             renderRoutes();
         }
 
         function handleShipChange() {
+            startNewSearch();
             selectedShips = Array.from(document.querySelectorAll('#shipDropdown input[type="checkbox"]:checked')).map(cb => cb.value);
             document.getElementById('shipSelectText').textContent = selectedShips.length > 0 ? `${selectedShips.length} Schiff(e) gewählt` : 'Alle Schiffe';
             renderRoutes();
         }
 
         function handleDurationChange() {
+            startNewSearch();
             selectedDurations = Array.from(document.querySelectorAll('#durationDropdown input[type="checkbox"]:checked')).map(cb => cb.value);
             document.getElementById('durationSelectText').textContent = selectedDurations.length > 0 ? `${selectedDurations.length} Option(en) gewählt` : 'Alle Dauern';
             renderRoutes();
         }
 
         function resetAllFilters() {
+            startNewSearch();
             selectedRegions = [];
             selectedPorts = [];
             selectedShips = [];
