@@ -269,7 +269,7 @@
 
         /* Persönliche Beratung – Chatfenster */
         .back-to-top { bottom:92px; }
-        .consultation-chat { position:fixed; right:22px; bottom:22px; z-index:60; display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
+        .consultation-chat { position:fixed; right:22px; bottom:22px; z-index:10000; display:flex; flex-direction:column; align-items:flex-end; gap:10px; pointer-events:auto; }
         .consultation-chat__panel { width:min(360px, calc(100vw - 32px)); padding:18px; border:1px solid rgba(0,51,102,.12); border-radius:16px; background:#fff; box-shadow:0 12px 32px rgba(10,26,47,.22); transform:translateY(12px) scale(.97); opacity:0; visibility:hidden; transition:opacity .25s ease, transform .25s ease, visibility .25s; }
         .consultation-chat.is-open .consultation-chat__panel { transform:translateY(0) scale(1); opacity:1; visibility:visible; }
         .consultation-chat__header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; color:var(--primary); }
@@ -289,12 +289,12 @@
         .consultation-chat__toggle:hover { transform:translateY(-2px) scale(1.04); box-shadow:0 9px 22px rgba(0,31,63,.38); }
         .consultation-chat.is-open .consultation-chat__toggle { display:none; }
         @media (max-width:768px) {
-            .consultation-chat { right:15px; bottom:15px; }
+            .consultation-chat { right:max(15px, env(safe-area-inset-right)); bottom:max(15px, env(safe-area-inset-bottom)); }
             .back-to-top { right:15px; bottom:82px; }
         }
 
         /* Intelligenter Beratungs-Concierge */
-        .consultation-chat__panel { padding:0; overflow:hidden; }
+        .consultation-chat__panel { max-height:calc(100dvh - 24px); padding:0; overflow:hidden; }
         .smart-chat__header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 18px 12px; color:#fff; background:linear-gradient(135deg, #003366, #0A1A2F); }
         .smart-chat__identity { display:flex; align-items:center; gap:9px; min-width:0; }
         .smart-chat__identity strong { display:block; font-size:14px; }
@@ -325,7 +325,10 @@
         .smart-chat__contact-link--mail { background:#4a5568; }
         .smart-chat__utility { display:flex; justify-content:center; padding:0 16px 12px; background:#fff; }
         .smart-chat__restart { padding:0; border:0; color:#587087; background:transparent; cursor:pointer; font:inherit; font-size:11px; text-decoration:underline; }
-        @media (max-width:768px) { .smart-chat__messages { max-height:250px; } }
+        @media (max-width:768px) {
+            .smart-chat__messages { min-height:100px; max-height:190px; }
+            .smart-chat__suggestion { max-height:150px; overflow-y:auto; }
+        }
     </style>
 </head>
 <body>
@@ -465,7 +468,7 @@
         </div>
     </footer>
 
-    <aside class="consultation-chat" id="consultationChat" aria-label="Persönliche Beratung">
+    <aside class="consultation-chat is-open" id="consultationChat" aria-label="Persönliche Beratung">
         <div class="consultation-chat__panel" id="consultationChatPanel" role="dialog" aria-modal="false" aria-labelledby="consultationChatTitle">
             <div class="smart-chat__header">
                 <div class="smart-chat__identity" id="consultationChatTitle">
@@ -476,7 +479,12 @@
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
             </div>
-            <div class="smart-chat__messages" id="smartChatMessages" aria-live="polite" aria-label="Beratungschat"></div>
+            <div class="smart-chat__messages" id="smartChatMessages" aria-live="polite" aria-label="Beratungschat">
+                <div class="smart-chat__message">
+                    <img class="smart-chat__avatar" src="favicon.png" alt="Core Cruises">
+                    <p class="smart-chat__bubble">Brauchst du Unterstützung bei der Wahl deiner Route?</p>
+                </div>
+            </div>
             <div class="smart-chat__suggestion" id="smartChatSuggestion">
                 <span class="smart-chat__suggestion-label">Wähle, wobei ich helfen darf</span>
                 <div class="smart-chat__actions" id="smartChatActions"></div>
@@ -487,8 +495,8 @@
             </form>
             <p class="smart-chat__note">Deine Eingabe wird nicht gespeichert. Erst beim Kontakt per WhatsApp oder E-Mail wird sie an uns übermittelt.</p>
             <div class="smart-chat__contact">
-                <a class="smart-chat__contact-link smart-chat__contact-link--whatsapp" id="consultationChatWhatsApp" href="#" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i> WhatsApp</a>
-                <a class="smart-chat__contact-link smart-chat__contact-link--mail" id="consultationChatMail" href="#"><i class="fa-regular fa-envelope" aria-hidden="true"></i> E-Mail</a>
+                <a class="smart-chat__contact-link smart-chat__contact-link--whatsapp" id="consultationChatWhatsApp" href="https://wa.me/493083199468?text=Hallo%20Core%20Cruises%2C%20ich%20brauche%20Unterst%C3%BCtzung%20bei%20der%20Wahl%20meiner%20Kreuzfahrtroute." target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i> WhatsApp</a>
+                <a class="smart-chat__contact-link smart-chat__contact-link--mail" id="consultationChatMail" href="mailto:kontakt@corecruises.de?subject=Beratung%20zur%20Kreuzfahrtroute"><i class="fa-regular fa-envelope" aria-hidden="true"></i> E-Mail</a>
             </div>
             <div class="smart-chat__utility"><button class="smart-chat__restart" id="smartChatRestart" type="button">Beratung neu starten</button></div>
         </div>
