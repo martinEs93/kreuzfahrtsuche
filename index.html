@@ -266,6 +266,32 @@
         .header-container, .footer-container { padding:15px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
         .footer-content { width:100%; display:flex; flex-direction:column; align-items:center; gap:10px; }
         .footer-links a { color:var(--header-footer-text) !important; text-decoration:none; font-weight:500; }
+
+        /* Persönliche Beratung – Chatfenster */
+        .back-to-top { bottom:92px; }
+        .consultation-chat { position:fixed; right:22px; bottom:22px; z-index:60; display:flex; flex-direction:column; align-items:flex-end; gap:10px; }
+        .consultation-chat__panel { width:min(360px, calc(100vw - 32px)); padding:18px; border:1px solid rgba(0,51,102,.12); border-radius:16px; background:#fff; box-shadow:0 12px 32px rgba(10,26,47,.22); transform:translateY(12px) scale(.97); opacity:0; visibility:hidden; transition:opacity .25s ease, transform .25s ease, visibility .25s; }
+        .consultation-chat.is-open .consultation-chat__panel { transform:translateY(0) scale(1); opacity:1; visibility:visible; }
+        .consultation-chat__header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; color:var(--primary); }
+        .consultation-chat__brand { display:flex; align-items:center; gap:9px; font-size:14px; font-weight:700; }
+        .consultation-chat__logo { display:block; width:30px; height:30px; border-radius:50%; object-fit:cover; background:#e8f0f7; }
+        .consultation-chat__close { display:grid; place-items:center; width:30px; height:30px; padding:0; border:0; border-radius:50%; color:#4a5568; background:transparent; cursor:pointer; font-size:17px; }
+        .consultation-chat__close:hover { color:var(--primary); background:#edf2f7; }
+        .consultation-chat__message-row { display:flex; align-items:flex-start; gap:9px; margin-bottom:15px; }
+        .consultation-chat__message-avatar { flex:0 0 auto; display:block; width:32px; height:32px; margin-top:2px; border-radius:50%; object-fit:cover; background:#e8f0f7; }
+        .consultation-chat__message { margin:0; padding:12px 14px; border-radius:4px 14px 14px 14px; color:#173b60; background:#edf5fc; font-size:15px; font-weight:600; line-height:1.45; }
+        .consultation-chat__actions { display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+        .consultation-chat__action { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:42px; padding:9px 10px; border-radius:8px; color:#fff; text-decoration:none; font-size:13px; font-weight:700; transition:transform .2s, box-shadow .2s; }
+        .consultation-chat__action:hover { transform:translateY(-1px); box-shadow:0 4px 10px rgba(10,26,47,.18); }
+        .consultation-chat__action--whatsapp { background:linear-gradient(135deg, #25D366, #1da851); }
+        .consultation-chat__action--mail { background:linear-gradient(135deg, #4a5568, #2d3748); }
+        .consultation-chat__toggle { display:grid; place-items:center; width:56px; height:56px; padding:0; border:0; border-radius:50%; color:#fff; background:linear-gradient(135deg, #003366, #001f3f); box-shadow:0 6px 18px rgba(0,31,63,.3); cursor:pointer; font-size:22px; transition:transform .2s, box-shadow .2s; }
+        .consultation-chat__toggle:hover { transform:translateY(-2px) scale(1.04); box-shadow:0 9px 22px rgba(0,31,63,.38); }
+        .consultation-chat.is-open .consultation-chat__toggle { display:none; }
+        @media (max-width:768px) {
+            .consultation-chat { right:15px; bottom:15px; }
+            .back-to-top { right:15px; bottom:82px; }
+        }
     </style>
 </head>
 <body>
@@ -404,6 +430,35 @@
             </div>
         </div>
     </footer>
+
+    <aside class="consultation-chat" id="consultationChat" aria-label="Persönliche Beratung">
+        <div class="consultation-chat__panel" id="consultationChatPanel" role="dialog" aria-modal="false" aria-labelledby="consultationChatTitle">
+            <div class="consultation-chat__header">
+                <div class="consultation-chat__brand" id="consultationChatTitle">
+                    <img class="consultation-chat__logo" src="favicon.png" alt="">
+                    Core Cruises
+                </div>
+                <button class="consultation-chat__close" id="consultationChatClose" type="button" aria-label="Beratungsfenster schließen">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="consultation-chat__message-row">
+                <img class="consultation-chat__message-avatar" src="favicon.png" alt="Core Cruises">
+                <p class="consultation-chat__message">Brauchst du Unterstützung bei der Wahl deiner Route?</p>
+            </div>
+            <div class="consultation-chat__actions">
+                <a class="consultation-chat__action consultation-chat__action--whatsapp" id="consultationChatWhatsApp" href="#" target="_blank" rel="noopener">
+                    <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> WhatsApp
+                </a>
+                <a class="consultation-chat__action consultation-chat__action--mail" id="consultationChatMail" href="#">
+                    <i class="fa-regular fa-envelope" aria-hidden="true"></i> E-Mail
+                </a>
+            </div>
+        </div>
+        <button class="consultation-chat__toggle" id="consultationChatToggle" type="button" aria-label="Persönliche Beratung öffnen" aria-expanded="false">
+            <i class="fa-regular fa-comment-dots" aria-hidden="true"></i>
+        </button>
+    </aside>
 
     <button class="back-to-top" id="backToTop" type="button" aria-label="Zum Seitenanfang" title="Zum Seitenanfang">
         <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
@@ -6236,6 +6291,34 @@ endDateInput.addEventListener('change', handleDateUpdate);
 
             window.location.href = mailtoUrl;
         }
+
+        // Beratungs-Chat: führt Interessierte direkt in die persönliche Beratung.
+        (function initConsultationChat() {
+            const chat = document.getElementById('consultationChat');
+            const toggle = document.getElementById('consultationChatToggle');
+            const close = document.getElementById('consultationChatClose');
+            const whatsapp = document.getElementById('consultationChatWhatsApp');
+            const mail = document.getElementById('consultationChatMail');
+            if (!chat || !toggle || !close || !whatsapp || !mail) return;
+
+            const message = 'Hallo Core Cruises, ich brauche Unterstützung bei der Wahl meiner Kreuzfahrtroute.';
+            whatsapp.href = `https://wa.me/${MY_PHONE_NUMBER}?text=${encodeURIComponent(message)}`;
+            mail.href = `mailto:${MY_EMAIL}?subject=${encodeURIComponent('Beratung zur Kreuzfahrtroute')}&body=${encodeURIComponent(message)}`;
+
+            function setOpen(isOpen) {
+                chat.classList.toggle('is-open', isOpen);
+                toggle.setAttribute('aria-expanded', String(isOpen));
+            }
+
+            toggle.addEventListener('click', () => setOpen(true));
+            close.addEventListener('click', () => setOpen(false));
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape') setOpen(false);
+            });
+
+            // Kurz nach dem Laden sichtbar, damit es nicht vom Seitenaufbau ablenkt.
+            window.setTimeout(() => setOpen(true), 1000);
+        })();
     </script>
 </body>
 </html>
