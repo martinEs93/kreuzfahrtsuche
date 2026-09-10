@@ -6516,12 +6516,20 @@ endDateInput.addEventListener('change', handleDateUpdate);
                     april:4, apr:4, mai:5, juni:6, jun:6, juli:7, jul:7, august:8, aug:8,
                     september:9, sep:9, oktober:10, okt:10, november:11, nov:11, dezember:12, dez:12
                 };
-                const monthMatch = normalized.match(/\b([a-zä]+)\.?\s+(20\d{2})\b/);
+                // Akzeptiert „Januar 2028“, „Januar 28“, „Jan. 28“ und „01/2028“.
+                const monthMatch = normalized.match(/\b([a-zä]+)\.?\s+(20\d{2}|\d{2})\b/);
+                const numericMonthMatch = normalized.match(/\b(0?[1-9]|1[0-2])\s*[/.\-]\s*(20\d{2}|\d{2})\b/);
                 let startDate = '';
                 let endDate = '';
                 if (monthMatch && months[monthMatch[1]]) {
-                    const year = Number(monthMatch[2]);
+                    const year = monthMatch[2].length === 2 ? 2000 + Number(monthMatch[2]) : Number(monthMatch[2]);
                     const month = months[monthMatch[1]];
+                    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+                    startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+                    endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+                } else if (numericMonthMatch) {
+                    const month = Number(numericMonthMatch[1]);
+                    const year = numericMonthMatch[2].length === 2 ? 2000 + Number(numericMonthMatch[2]) : Number(numericMonthMatch[2]);
                     const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
                     startDate = `${year}-${String(month).padStart(2, '0')}-01`;
                     endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
