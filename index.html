@@ -6259,4 +6259,314 @@ endDateInput.addEventListener('change', handleDateUpdate);
 
         function shareByEmail(id) {
             const route = routesData.find(r => r.id === id);
-            
+            const subject = `Kreuzfahrt-Route: ${route.title}`;
+            const body = `Schau dir diese Kreuzfahrt-Route an:\n\n${getRouteShareText(route)}\n\n${getRouteShareUrl(route)}`;
+            window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        }
+
+        async function copyRouteLink(id) {
+            const route = routesData.find(r => r.id === id);
+            const text = `${getRouteShareText(route)}\n${getRouteShareUrl(route)}`;
+            try {
+                await navigator.clipboard.writeText(text);
+                setShareStatus(id, 'Link wurde kopiert.');
+            } catch (error) {
+                setShareStatus(id, 'Link konnte nicht automatisch kopiert werden.');
+            }
+        }
+
+        async function shareWithDevice(id) {
+            const route = routesData.find(r => r.id === id);
+            const shareData = { title: route.title, text: getRouteShareText(route), url: getRouteShareUrl(route) };
+            if (navigator.share) {
+                try {
+                    await navigator.share(shareData);
+                } catch (error) {
+                    // Abbrechen des Teilen-Dialogs ist keine Fehlermeldung.
+                }
+            } else {
+                await copyRouteLink(id);
+                setShareStatus(id, 'Link kopiert – bitte in Instagram oder einer anderen App einfügen.');
+            }
+        }
+
+        function sendWhatsApp(id) {
+            const route = routesData.find(r => r.id === id);
+            if (!route) return;
+
+            const departureDate = getSelectedDeparture(id);
+
+            const message = "Hallo! Ich habe Interesse an folgender Route:\n" +
+                            "*" + route.title + "*\n" +
+                            "Reisezeitraum: " + departureDate + "\n" +
+                            "Schiff: " + route.schiff + "\n" +
+                            "Hafen: " + route.startPort + "\n\n" +
+                            "Bitte um unverbindliche Beratung.";
+
+            window.open("https://wa.me/" + MY_PHONE_NUMBER + "?text=" + encodeURIComponent(message), '_blank');
+        }
+
+        function sendEmail(id) {
+            const route = routesData.find(r => r.id === id);
+            if (!route) return;
+
+            const departureDate = getSelectedDeparture(id);
+
+            const subject = "Anfrage zur Kreuzfahrt: " + route.title;
+            const body = "Hallo Team von corecruises.de,\n\n" +
+                         "ich habe Interesse an folgender Route:\n" +
+                         "- Route: " + route.title + "\n" +
+                         "- Gewünschter Reisezeitraum: " + departureDate + "\n" +
+                         "- Schiff: " + route.schiff + "\n" +
+                         "- Abfahrtshafen: " + route.startPort + "\n\n" +
+                         "Bitte senden Sie mir ein unverbindliches Angebot zu.\n\n" +
+                         "Viele Grüße";
+
+            const mailtoUrl = "mailto:" + MY_EMAIL +
+                              "?subject=" + encodeURIComponent(subject) +
+                              "&body=" + encodeURIComponent(body);
+
+            window.location.href = mailtoUrl;
+        }
+
+        // Dialoggesteuerter Beratungs-Concierge für persönliche, manuelle Buchungen.
+        (function initSmartConsultationChat() {
+            const chat = document.getElementById('consultationChat');
+            const toggle = document.getElementById('consultationChatToggle');
+            const close = document.getElementById('consultationChatClose');
+            const messages = document.getElementById('smartChatMessages');
+            const actions = document.getElementById('smartChatActions');
+            const suggestion = document.getElementById('smartChatSuggestion');
+            const suggestionLabel = suggestion?.querySelector('.smart-chat__suggestion-label');
+            const form = document.getElementById('smartChatForm');
+            const input = document.getElementById('smartChatInput');
+            const restart = document.getElementById('smartChatRestart');
+            const whatsapp = document.getElementById('consultationChatWhatsApp');
+            const mail = document.getElementById('consultationChatMail');
+            if (!chat || !toggle || !close || !messages || !actions || !suggestion || !suggestionLabel || !form || !input || !restart || !whatsapp || !mail) return;
+
+            let submitTextAnswer = null;
+            let advisorState = {};
+
+            function setOpen(isOpen) {
+                chat.classList.toggle('is-open', isOpen);
+                toggle.setAttribute('aria-expanded', String(isOpen));
+            }
+
+            function addMessage(text, fromUser = false) {
+                const row = document.createElement('div');
+                row.className = `smart-chat__message${fromUser ? ' smart-chat__message--user' : ''}`;
+                if (!fromUser) {
+                    const avatar = document.createElement('img');
+                    avatar.className = 'smart-chat__avatar';
+                    avatar.src = 'favicon.png';
+                    avatar.alt = 'Core Cruises';
+                    row.appendChild(avatar);
+                }
+                const bubble = document.createElement('p');
+                bubble.className = 'smart-chat__bubble';
+                bubble.textContent = text;
+                row.appendChild(bubble);
+                messages.appendChild(row);
+                messages.scrollTop = messages.scrollHeight;
+            }
+
+            function setActions(label, choices = []) {
+                suggestionLabel.textContent = label;
+                actions.replaceChildren();
+                choices.forEach(choice => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'smart-chat__action';
+                    button.textContent = choice.label;
+                    button.addEventListener('click', () => {
+                        addMessage(choice.label, true);
+                        choice.run();
+                    });
+                    actions.appendChild(button);
+                });
+                suggestion.hidden = choices.length === 0;
+                form.hidden = true;
+                submitTextAnswer = null;
+            }
+
+            function askForText(question, placeholder, onAnswer) {
+                addMessage(question);
+                suggestion.hidden = true;
+                form.hidden = false;
+                input.value = '';
+                input.placeholder = placeholder;
+                input.focus();
+                submitTextAnswer = onAnswer;
+            }
+
+            function getFilterSummary() {
+                const parts = [];
+                if (selectedRegions.length) parts.push(`Region: ${selectedRegions.join(', ')}`);
+                if (selectedPorts.length) parts.push(`Abfahrtshafen: ${selectedPorts.join(', ')}`);
+                if (selectedShips.length) parts.push(`Schiff: ${selectedShips.join(', ')}`);
+                if (selectedDurations.length) {
+                    const durations = selectedDurations.map(value => allDurationsList.find(duration => duration.value === value)?.label || value);
+                    parts.push(`Reisedauer: ${durations.join(', ')}`);
+                }
+                const start = document.getElementById('startDate')?.value;
+                const end = document.getElementById('endDate')?.value;
+                if (start) parts.push(`früheste Abreise: ${formatFilterDate(start)}`);
+                if (end) parts.push(`späteste Abreise: ${formatFilterDate(end)}`);
+                return parts;
+            }
+
+            function getFavoriteRoutes() {
+                return routesData.filter(route => favoriteRouteIds.has(route.id));
+            }
+
+            function getSharedRoute() {
+                const id = Number(new URLSearchParams(window.location.search).get('route'));
+                return Number.isInteger(id) && id > 0 ? routesData.find(route => route.id === id) : null;
+            }
+
+            function buildContactMessage() {
+                const parts = ['Hallo Core Cruises, ich wünsche eine persönliche Beratung zu einer Kreuzfahrtroute.'];
+                if (advisorState.goal) parts.push(`Anliegen: ${advisorState.goal}.`);
+                if (advisorState.priority) parts.push(`Besonders wichtig: ${advisorState.priority}.`);
+                if (advisorState.focusRoute) parts.push(`Interessante Route: ${advisorState.focusRoute.title} (${advisorState.focusRoute.schiff}, ab ${advisorState.focusRoute.startPort}, ${advisorState.focusRoute.nights} Nächte).`);
+                if (advisorState.favoriteTitles?.length) parts.push(`Gespeicherte Favoriten: ${advisorState.favoriteTitles.join(', ')}.`);
+                const filters = getFilterSummary();
+                if (filters.length) parts.push(`Aktuelle Suche: ${filters.join('; ')}.`);
+                if (advisorState.details) parts.push(`Weitere Wünsche: ${advisorState.details}`);
+                return parts.join('\n');
+            }
+
+            function refreshContactLinks() {
+                const message = buildContactMessage();
+                const subject = advisorState.focusRoute
+                    ? `Beratung zur Route: ${advisorState.focusRoute.title}`
+                    : 'Persönliche Kreuzfahrtberatung';
+                whatsapp.href = `https://wa.me/${MY_PHONE_NUMBER}?text=${encodeURIComponent(message)}`;
+                mail.href = `mailto:${MY_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(message)}`;
+            }
+
+            function finishWithContact(nextStep) {
+                refreshContactLinks();
+                addMessage(`${nextStep}\n\nIch habe die Angaben für deine Anfrage vorbereitet. Wähle jetzt einfach WhatsApp oder E-Mail – unser Team stellt dir passende Routen persönlich zusammen.`);
+                setActions('Wie möchtest du weitergehen?', [
+                    { label: 'Beratung neu starten', run: startConversation }
+                ]);
+            }
+
+            function askForWishDetails() {
+                askForText(
+                    'Magst du mir noch Reisezeit, Personenzahl, Abfahrtshafen oder einen besonderen Wunsch nennen? Du kannst auch „ohne weitere Wünsche“ schreiben.',
+                    'z. B. August 2027, 2 Erwachsene, ab Hamburg',
+                    answer => {
+                        advisorState.details = answer || 'Keine weiteren Angaben';
+                        addMessage(advisorState.details, true);
+                        finishWithContact('Sehr gut – damit können wir gezielter für dich suchen.');
+                    }
+                );
+            }
+
+            function startRouteFinder() {
+                advisorState.goal = 'Ich möchte eine passende Kreuzfahrtroute finden';
+                addMessage('Worauf soll ich bei deiner Route zuerst achten?');
+                setActions('Deine Priorität', [
+                    { label: 'Reiseziel / Route', run: () => { advisorState.priority = 'ein passendes Reiseziel und eine schöne Route'; askForWishDetails(); } },
+                    { label: 'Reisezeitraum', run: () => { advisorState.priority = 'der passende Reisezeitraum'; askForWishDetails(); } },
+                    { label: 'Reisedauer', run: () => { advisorState.priority = 'die ideale Reisedauer'; askForWishDetails(); } },
+                    { label: 'Passendes Schiff', run: () => { advisorState.priority = 'ein passendes Schiff und Bord-Erlebnis'; askForWishDetails(); } }
+                ]);
+            }
+
+            function checkFavorites() {
+                const favorites = getFavoriteRoutes();
+                advisorState.goal = 'Ich möchte meine gespeicherten Routen-Favoriten prüfen';
+                advisorState.favoriteTitles = favorites.map(route => route.title);
+                if (!favorites.length) {
+                    addMessage('Du hast aktuell noch keine gespeicherten Favoriten. Ich helfe dir gern, die Auswahl einzugrenzen.');
+                    setActions('Wie möchtest du weitergehen?', [
+                        { label: 'Route finden', run: startRouteFinder },
+                        { label: 'Aktuelle Suche beraten', run: adviseCurrentSearch }
+                    ]);
+                    return;
+                }
+                const names = favorites.slice(0, 2).map(route => `„${route.title}“`).join(' und ');
+                const more = favorites.length > 2 ? ` sowie ${favorites.length - 2} weitere` : '';
+                addMessage(`Du hast ${favorites.length} Favorit${favorites.length === 1 ? '' : 'en'} gespeichert: ${names}${more}.`);
+                setActions('Was soll ich für dich vorbereiten?', [
+                    { label: 'Routen vergleichen', run: () => finishWithContact('Wir vergleichen deine Favoriten gern hinsichtlich Route, Schiff, Abfahrtshafen und Reisedauer.') },
+                    { label: 'Eine Route beraten', run: () => { advisorState.focusRoute = favorites[0]; finishWithContact(`Wir beraten dich gern persönlich zu „${advisorState.focusRoute.title}“ und passenden Alternativen.`); } },
+                    { label: 'Andere Routen finden', run: startRouteFinder }
+                ]);
+            }
+
+            function adviseCurrentSearch() {
+                advisorState.goal = 'Ich möchte die aktuelle Routensuche beraten lassen';
+                const filters = getFilterSummary();
+                if (filters.length) {
+                    addMessage(`Ich sehe deine aktuelle Suche: ${filters.join(' · ')}.`);
+                    askForWishDetails();
+                } else {
+                    addMessage('Du hast noch keine Suchkriterien gewählt. Kein Problem – wir finden sie gemeinsam.');
+                    startRouteFinder();
+                }
+            }
+
+            function requestCallback() {
+                advisorState.goal = 'Ich wünsche einen Rückruf';
+                askForText(
+                    'Wann passt dir ein Rückruf am besten? Nenne gern Tag, Uhrzeit und eine Telefonnummer.',
+                    'z. B. morgen ab 16 Uhr, 0170 …',
+                    answer => {
+                        advisorState.details = answer || 'Bitte Rückrufmöglichkeiten abstimmen';
+                        addMessage(advisorState.details, true);
+                        finishWithContact('Sehr gern – sende uns deine Rückrufwünsche über einen der Kontaktwege.');
+                    }
+                );
+            }
+
+            function startConversation() {
+                advisorState = {};
+                messages.replaceChildren();
+                const sharedRoute = getSharedRoute();
+                if (sharedRoute) {
+                    advisorState.focusRoute = sharedRoute;
+                    addMessage(`Du schaust dir gerade „${sharedRoute.title}“ an. Soll ich dir diese Route persönlich einordnen oder ähnliche Optionen heraussuchen?`);
+                    setActions('Ich kann sofort helfen', [
+                        { label: 'Diese Route beraten', run: () => { advisorState.goal = 'Beratung zu einer konkreten Route'; finishWithContact(`Wir beraten dich gern zu „${sharedRoute.title}“ und prüfen passende Reisetermine.`); } },
+                        { label: 'Ähnliche Routen finden', run: startRouteFinder },
+                        { label: 'Meine Favoriten ansehen', run: checkFavorites }
+                    ]);
+                } else {
+                    addMessage('Hallo, ich bin dein digitaler Reiseassistent von Core Cruises. Ich helfe dir, Routen einzuordnen und die richtige Anfrage für unser Beratungsteam vorzubereiten.');
+                    setActions('Wobei darf ich helfen?', [
+                        { label: 'Passende Route finden', run: startRouteFinder },
+                        { label: 'Meine Favoriten prüfen', run: checkFavorites },
+                        { label: 'Aktuelle Suche beraten', run: adviseCurrentSearch },
+                        { label: 'Rückruf anfragen', run: requestCallback }
+                    ]);
+                }
+                refreshContactLinks();
+            }
+
+            form.addEventListener('submit', event => {
+                event.preventDefault();
+                const answer = input.value.trim();
+                if (!submitTextAnswer) return;
+                const handler = submitTextAnswer;
+                submitTextAnswer = null;
+                form.hidden = true;
+                handler(answer);
+            });
+            toggle.addEventListener('click', () => setOpen(true));
+            close.addEventListener('click', () => setOpen(false));
+            restart.addEventListener('click', startConversation);
+            document.addEventListener('keydown', event => {
+                if (event.key === 'Escape') setOpen(false);
+            });
+
+            startConversation();
+            window.setTimeout(() => setOpen(true), 1000);
+        })();
+    </script>
+</body>
+</html>
