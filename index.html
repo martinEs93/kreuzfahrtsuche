@@ -206,6 +206,15 @@
         }
         .btn-toggle:hover, .btn-hide:hover { background-color: #e2e8f0; }
 
+        .share-actions { display:none; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+        .share-actions.open { display:grid; }
+        .btn-share { align-self:flex-end; width:auto; padding:8px 12px; color:var(--primary); background:#fff; border:1px solid rgba(0, 51, 102, .28); box-shadow:none; font-size:13px; }
+        .btn-share:hover { color:#fff; background:var(--primary); border-color:var(--primary); }
+        .share-link { display:flex; align-items:center; justify-content:center; gap:7px; min-width:0; padding:9px 8px; border:1px solid #d7e3ee; border-radius:7px; color:#23405e; background:#fff; text-decoration:none; font-size:12px; font-weight:700; transition:all .2s ease; }
+        .share-link:hover { color:var(--primary); border-color:var(--primary); background:#edf5fc; }
+        .share-link--wide { grid-column:1 / -1; }
+        .share-status { min-height:18px; margin:0; color:#587087; text-align:center; font-size:12px; }
+
         .details-expanded { display:none; padding:18px 20px; background:#f8fafc; border-top:1px solid var(--border); font-size:14px; color:#2c3e50; line-height:1.6; }
         .details-expanded.open { display:block; }
         .detail-section + .detail-section { margin-top:18px; padding-top:16px; border-top:1px dashed #dbe4ee; }
@@ -5772,6 +5781,8 @@ endDateInput.addEventListener('change', handleDateUpdate);
         function renderRoutes(resetPagination = true) {
             const grid = document.getElementById('routeGrid');
             grid.innerHTML = '';
+            const sharedRouteId = Number(new URLSearchParams(window.location.search).get('route'));
+            const isSharedRoute = Number.isInteger(sharedRouteId) && sharedRouteId > 0;
 
             if (resetPagination) visibleRoutes = ROUTES_PER_PAGE;
 
@@ -5779,13 +5790,16 @@ endDateInput.addEventListener('change', handleDateUpdate);
             const endVal = document.getElementById('endDate').value;
 
             // Pflichtfilter prüfen: mindestens 1 Region UND mindestens Startdatum (Von)
-            if (selectedRegions.length === 0 || !startVal) {
+            if (!isSharedRoute && (selectedRegions.length === 0 || !startVal)) {
                 updateResultsToolbar(0, false);
                 grid.innerHTML = '<div class="no-results">Bitte wähle mindestens eine Region und das früheste Abreisedatum aus, um passende Routen angezeigt zu bekommen.</div>';
                 return;
             }
 
             const filtered = routesData.filter(route => {
+                // Geteilte Links zeigen die Route unabhängig von Suchfiltern direkt an.
+                if (isSharedRoute) return route.id === sharedRouteId;
+
                 // Region Filter
                 if (!selectedRegions.includes(route.region)) return false;
 
@@ -5882,6 +5896,17 @@ endDateInput.addEventListener('change', handleDateUpdate);
                         <button class="btn btn-toggle" onclick="toggleDetails(${route.id})" id="btn_det_${route.id}">
                             Details anzeigen <i class="fa-solid fa-chevron-down"></i>
                         </button>
+                        <button class="btn btn-share" type="button" onclick="shareRoute(${route.id})" aria-expanded="false" aria-controls="share_${route.id}" id="btn_share_${route.id}">
+                            <i class="fa-solid fa-share-nodes" aria-hidden="true"></i> Teilen
+                        </button>
+                        <div class="share-actions" id="share_${route.id}" aria-label="Route teilen">
+                            <a class="share-link" href="#" onclick="shareOnWhatsApp(${route.id}); return false;"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i> WhatsApp</a>
+                            <a class="share-link" href="#" onclick="shareOnFacebook(${route.id}); return false;"><i class="fa-brands fa-facebook-f" aria-hidden="true"></i> Facebook</a>
+                            <a class="share-link" href="#" onclick="shareByEmail(${route.id}); return false;"><i class="fa-regular fa-envelope" aria-hidden="true"></i> E-Mail</a>
+                            <button class="share-link" type="button" onclick="shareWithDevice(${route.id})"><i class="fa-brands fa-instagram" aria-hidden="true"></i> Instagram &amp; mehr</button>
+                            <button class="share-link share-link--wide" type="button" onclick="copyRouteLink(${route.id})"><i class="fa-regular fa-copy" aria-hidden="true"></i> Link kopieren</button>
+                        </div>
+                        <p class="share-status" id="share_status_${route.id}" role="status" aria-live="polite"></p>
                     </div>
 
                     <div class="details-expanded" id="details_${route.id}">
@@ -5968,6 +5993,92 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 return selectedRadio.value;
             }
             return "Auf Anfrage";
+        }
+
+        function getRouteShareUrl(route) {
+            const url = new URL(window.location.href);
+            // Suchfilter werden bewusst entfernt, damit der Link immer direkt zur Route führt.
+            url.search = '';
+            url.searchParams.set('route', route.id);
+            return url.toString();
+        }
+
+        function getRouteShareText(route) {
+            return `${route.title} – ${route.schiff}, ab ${route.startPort}, ${route.nights} Nächte`;
+        }
+
+        async function shareRoute(id) {
+            const route = routesData.find(r => r.id === id);
+            const shareData = { title: route.title, text: getRouteShareText(route), url: getRouteShareUrl(route) };
+
+            // Mobil öffnet dies den üblichen Teilen-Dialog mit den installierten Apps.
+            if (navigator.share) {
+                try {
+                    await navigator.share(shareData);
+                } catch (error) {
+                    // Abbrechen des Teilen-Dialogs ist keine Fehlermeldung.
+                }
+                return;
+            }
+
+            // Ältere Desktop-Browser erhalten die einzelnen Teilen-Optionen als Fallback.
+            toggleShare(id);
+        }
+
+        function toggleShare(id) {
+            const panel = document.getElementById(`share_${id}`);
+            const button = document.getElementById(`btn_share_${id}`);
+            const isOpen = panel.classList.toggle('open');
+            button.setAttribute('aria-expanded', String(isOpen));
+        }
+
+        function setShareStatus(id, message) {
+            document.getElementById(`share_status_${id}`).textContent = message;
+        }
+
+        function shareOnWhatsApp(id) {
+            const route = routesData.find(r => r.id === id);
+            const message = `${getRouteShareText(route)}\n${getRouteShareUrl(route)}`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener');
+        }
+
+        function shareOnFacebook(id) {
+            const route = routesData.find(r => r.id === id);
+            const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getRouteShareUrl(route))}`;
+            window.open(url, '_blank', 'noopener');
+        }
+
+        function shareByEmail(id) {
+            const route = routesData.find(r => r.id === id);
+            const subject = `Kreuzfahrt-Route: ${route.title}`;
+            const body = `Schau dir diese Kreuzfahrt-Route an:\n\n${getRouteShareText(route)}\n\n${getRouteShareUrl(route)}`;
+            window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        }
+
+        async function copyRouteLink(id) {
+            const route = routesData.find(r => r.id === id);
+            const text = `${getRouteShareText(route)}\n${getRouteShareUrl(route)}`;
+            try {
+                await navigator.clipboard.writeText(text);
+                setShareStatus(id, 'Link wurde kopiert.');
+            } catch (error) {
+                setShareStatus(id, 'Link konnte nicht automatisch kopiert werden.');
+            }
+        }
+
+        async function shareWithDevice(id) {
+            const route = routesData.find(r => r.id === id);
+            const shareData = { title: route.title, text: getRouteShareText(route), url: getRouteShareUrl(route) };
+            if (navigator.share) {
+                try {
+                    await navigator.share(shareData);
+                } catch (error) {
+                    // Abbrechen des Teilen-Dialogs ist keine Fehlermeldung.
+                }
+            } else {
+                await copyRouteLink(id);
+                setShareStatus(id, 'Link kopiert – bitte in Instagram oder einer anderen App einfügen.');
+            }
         }
 
         function sendWhatsApp(id) {
