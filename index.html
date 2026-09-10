@@ -278,6 +278,7 @@
         /* Der unsichtbare, geschlossene Dialog darf keine Klicks auf der Seite abfangen. */
         .consultation-chat:not(.is-open) { pointer-events:none; }
         .consultation-chat:not(.is-open) .consultation-chat__toggle { pointer-events:auto; }
+        .consultation-chat:not(.is-open) .consultation-chat__hint { pointer-events:auto; }
         .consultation-chat__panel { width:min(360px, calc(100vw - 32px)); padding:18px; border:1px solid rgba(0,51,102,.12); border-radius:16px; background:#fff; box-shadow:0 12px 32px rgba(10,26,47,.22); transform:translateY(12px) scale(.97); opacity:0; visibility:hidden; transition:opacity .25s ease, transform .25s ease, visibility .25s; }
         .consultation-chat.is-open .consultation-chat__panel { transform:translateY(0) scale(1); opacity:1; visibility:visible; }
         .consultation-chat__header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; color:var(--primary); }
@@ -296,9 +297,15 @@
         .consultation-chat__toggle { display:grid; place-items:center; width:56px; height:56px; padding:0; border:0; border-radius:50%; color:#fff; background:linear-gradient(135deg, #003366, #001f3f); box-shadow:0 6px 18px rgba(0,31,63,.3); cursor:pointer; font-size:22px; transition:transform .2s, box-shadow .2s; }
         .consultation-chat__toggle:hover { transform:translateY(-2px) scale(1.04); box-shadow:0 9px 22px rgba(0,31,63,.38); }
         .consultation-chat.is-open .consultation-chat__toggle { display:none; }
+        .consultation-chat__hint { display:none; }
         @media (max-width:768px) {
             .consultation-chat { right:max(15px, env(safe-area-inset-right)); bottom:max(15px, env(safe-area-inset-bottom)); }
             .back-to-top { right:15px; bottom:82px; }
+            .consultation-chat.has-mobile-hint .consultation-chat__hint { display:flex; align-items:center; gap:8px; width:min(250px, calc(100vw - 94px)); margin:0 0 -2px; padding:9px 11px; border:0; border-radius:12px; color:#173b60; background:#fff; box-shadow:0 7px 20px rgba(10,26,47,.2); font:inherit; text-align:left; cursor:pointer; }
+            .consultation-chat__hint img { width:29px; height:29px; border-radius:50%; object-fit:cover; background:#e8f0f7; }
+            .consultation-chat__hint span { display:grid; gap:1px; font-size:11px; line-height:1.28; }
+            .consultation-chat__hint strong { color:#003366; font-size:12px; }
+            .consultation-chat.has-mobile-hint .consultation-chat__toggle { width:50px; height:50px; font-size:19px; }
         }
 
         /* Intelligenter Beratungs-Concierge */
@@ -477,7 +484,7 @@
         </div>
     </footer>
 
-    <aside class="consultation-chat is-open" id="consultationChat" aria-label="Persönliche Beratung">
+    <aside class="consultation-chat" id="consultationChat" aria-label="Persönliche Beratung">
         <div class="consultation-chat__panel" id="consultationChatPanel" role="dialog" aria-modal="false" aria-labelledby="consultationChatTitle">
             <div class="smart-chat__header">
                 <div class="smart-chat__identity" id="consultationChatTitle">
@@ -509,6 +516,10 @@
             </div>
             <div class="smart-chat__utility"><button class="smart-chat__restart" id="smartChatRestart" type="button">Beratung neu starten</button></div>
         </div>
+        <button class="consultation-chat__hint" id="consultationChatHint" type="button" aria-label="Persönliche Beratung öffnen">
+            <img src="favicon.png" alt="">
+            <span><strong>Core Cruises</strong>Brauchst du Hilfe bei deiner Route?</span>
+        </button>
         <button class="consultation-chat__toggle" id="consultationChatToggle" type="button" aria-label="Persönliche Beratung öffnen" aria-expanded="false">
             <i class="fa-regular fa-comment-dots" aria-hidden="true"></i>
         </button>
@@ -6425,6 +6436,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
         (function initSmartConsultationChat() {
             const chat = document.getElementById('consultationChat');
             const toggle = document.getElementById('consultationChatToggle');
+            const mobileHint = document.getElementById('consultationChatHint');
             const close = document.getElementById('consultationChatClose');
             const messages = document.getElementById('smartChatMessages');
             const actions = document.getElementById('smartChatActions');
@@ -6435,7 +6447,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
             const restart = document.getElementById('smartChatRestart');
             const whatsapp = document.getElementById('consultationChatWhatsApp');
             const mail = document.getElementById('consultationChatMail');
-            if (!chat || !toggle || !close || !messages || !actions || !suggestion || !suggestionLabel || !form || !input || !restart || !whatsapp || !mail) return;
+            if (!chat || !toggle || !mobileHint || !close || !messages || !actions || !suggestion || !suggestionLabel || !form || !input || !restart || !whatsapp || !mail) return;
 
             let submitTextAnswer = null;
             let advisorState = {};
@@ -6461,7 +6473,12 @@ endDateInput.addEventListener('change', handleDateUpdate);
 
             function setOpen(isOpen) {
                 chat.classList.toggle('is-open', isOpen);
+                if (isOpen) chat.classList.remove('has-mobile-hint');
                 toggle.setAttribute('aria-expanded', String(isOpen));
+            }
+
+            function isMobileChatViewport() {
+                return window.matchMedia?.('(max-width:768px)').matches;
             }
 
             function addMessage(text, fromUser = false) {
@@ -7705,6 +7722,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 handler(answer);
             });
             toggle.addEventListener('click', () => setOpen(true));
+            mobileHint.addEventListener('click', () => setOpen(true));
             close.addEventListener('click', () => setOpen(false));
             restart.addEventListener('click', startConversation);
             document.addEventListener('keydown', event => {
@@ -7712,7 +7730,14 @@ endDateInput.addEventListener('change', handleDateUpdate);
             });
 
             startConversation();
-            window.setTimeout(() => setOpen(true), 1000);
+            // Auf Mobilgeräten bleibt die Suche beim Einstieg frei sichtbar.
+            // Die Hinweis-Karte macht die persönliche Beratung trotzdem sichtbar.
+            if (isMobileChatViewport()) {
+                chat.classList.add('has-mobile-hint');
+                setOpen(false);
+            } else {
+                window.setTimeout(() => setOpen(true), 1000);
+            }
         })();
 
     </script>
