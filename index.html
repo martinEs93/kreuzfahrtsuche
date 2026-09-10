@@ -308,6 +308,13 @@
         .smart-chat__avatar { flex:0 0 auto; width:29px; height:29px; border-radius:50%; object-fit:cover; background:#e8f0f7; }
         .smart-chat__bubble { max-width:calc(100% - 38px); margin:0; padding:10px 12px; border-radius:5px 13px 13px; color:#173b60; background:#eaf3fb; font-size:14px; font-weight:600; line-height:1.42; white-space:pre-line; }
         .smart-chat__message--user .smart-chat__bubble { border-radius:13px 5px 13px 13px; color:#fff; background:#003366; }
+        .smart-chat__results { display:grid; gap:7px; padding:0 16px 10px; background:#f8fafc; }
+        .smart-chat__results[hidden] { display:none; }
+        .smart-chat__result { padding:10px; border:1px solid #cfe0f2; border-radius:9px; background:#fff; }
+        .smart-chat__result-title { display:block; color:#003366; font-size:13px; font-weight:800; line-height:1.3; }
+        .smart-chat__result-meta { display:block; margin-top:3px; color:#526a7e; font-size:11px; line-height:1.35; }
+        .smart-chat__result-button { width:100%; margin-top:8px; padding:7px 9px; border:1px solid #003366; border-radius:6px; color:#003366; background:#fff; cursor:pointer; font:inherit; font-size:11px; font-weight:800; }
+        .smart-chat__result-button:hover { color:#fff; background:#003366; }
         .smart-chat__suggestion { padding:8px 16px 13px; background:#f8fafc; }
         .smart-chat__suggestion-label { display:block; margin:0 0 7px; color:#64748b; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; }
         .smart-chat__actions { display:flex; flex-wrap:wrap; gap:7px; }
@@ -485,6 +492,7 @@
                     <p class="smart-chat__bubble">Brauchst du Unterstützung bei der Wahl deiner Route?</p>
                 </div>
             </div>
+            <div class="smart-chat__results" id="smartChatResults" hidden aria-label="Passende Routen"></div>
             <div class="smart-chat__suggestion" id="smartChatSuggestion">
                 <span class="smart-chat__suggestion-label">Wähle, wobei ich helfen darf</span>
                 <div class="smart-chat__actions" id="smartChatActions"></div>
@@ -6343,6 +6351,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
             const toggle = document.getElementById('consultationChatToggle');
             const close = document.getElementById('consultationChatClose');
             const messages = document.getElementById('smartChatMessages');
+            const results = document.getElementById('smartChatResults');
             const actions = document.getElementById('smartChatActions');
             const suggestion = document.getElementById('smartChatSuggestion');
             const suggestionLabel = suggestion?.querySelector('.smart-chat__suggestion-label');
@@ -6351,7 +6360,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
             const restart = document.getElementById('smartChatRestart');
             const whatsapp = document.getElementById('consultationChatWhatsApp');
             const mail = document.getElementById('consultationChatMail');
-            if (!chat || !toggle || !close || !messages || !actions || !suggestion || !suggestionLabel || !form || !input || !restart || !whatsapp || !mail) return;
+            if (!chat || !toggle || !close || !messages || !results || !actions || !suggestion || !suggestionLabel || !form || !input || !restart || !whatsapp || !mail) return;
 
             let submitTextAnswer = null;
             let advisorState = {};
@@ -6433,6 +6442,173 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 return Number.isInteger(id) && id > 0 ? routesData.find(route => route.id === id) : null;
             }
 
+            function normalizeChatQuery(value = '') {
+                return value
+                    .toLocaleLowerCase('de-DE')
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/ß/g, 'ss');
+            }
+
+            function parseRouteRequest(query) {
+                const normalized = normalizeChatQuery(query);
+                const regionAliases = [
+                    { region:'Karibik & Antillen', terms:['karibik', 'antillen'] },
+                    { region:'Mittelmeer', terms:['mittelmeer', 'mediterran'] },
+                    { region:'Nordeuropa', terms:['nordeuropa', 'norwegen', 'fjord', 'ostsee'] },
+                    { region:'Kanarische Inseln und Madeira', terms:['kanaren', 'madeira'] },
+                    { region:'Alaska', terms:['alaska'] },
+                    { region:'Südamerika', terms:['sudamerika', 'suedamerika'] },
+                    { region:'Asien', terms:['asien', 'japan'] },
+                    { region:'Südafrika', terms:['sudafrika', 'suedafrika'] }
+                ];
+                const match = regionAliases.find(entry => entry.terms.some(term => normalized.includes(term)));
+                const ships = [...new Set(routesData.map(route => route.schiff))];
+                const ship = ships.find(name => {
+                    const normalizedName = normalizeChatQuery(name);
+                    const withoutMsc = normalizedName.replace(/^msc\s+/, '');
+                    return normalized.includes(normalizedName) || (withoutMsc.length > 4 && normalized.includes(withoutMsc));
+                });
+                const months = {
+                    januar:1, jan:1, februar:2, feb:2, maerz:3, marz:3, märz:3,
+                    april:4, apr:4, mai:5, juni:6, jun:6, juli:7, jul:7, august:8, aug:8,
+                    september:9, sep:9, oktober:10, okt:10, november:11, nov:11, dezember:12, dez:12
+                };
+                const monthMatch = normalized.match(/\b([a-zä]+)\.?\s+(20\d{2})\b/);
+                let startDate = '';
+                let endDate = '';
+                if (monthMatch && months[monthMatch[1]]) {
+                    const year = Number(monthMatch[2]);
+                    const month = months[monthMatch[1]];
+                    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+                    startDate = `${year}-${String(month).padStart(2, '0')}-01`;
+                    endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+                }
+                return { region:match?.region || '', ship:ship || '', startDate, endDate, original:query };
+            }
+
+            function getMatchingChatRoutes(criteria) {
+                return routesData
+                    .map(route => ({
+                        route,
+                        departures:route.departures.filter(dep => {
+                            if (!isUpcomingDeparture(dep)) return false;
+                            if (criteria.startDate && dep.start < criteria.startDate) return false;
+                            if (criteria.endDate && dep.start > criteria.endDate) return false;
+                            return true;
+                        })
+                    }))
+                    .filter(({ route, departures }) =>
+                        (!criteria.region || route.region === criteria.region) &&
+                        (!criteria.ship || route.schiff === criteria.ship) &&
+                        departures.length > 0
+                    )
+                    .sort((a, b) => a.departures[0].start.localeCompare(b.departures[0].start));
+            }
+
+            function describeChatCriteria(criteria) {
+                const parts = [];
+                if (criteria.region) parts.push(criteria.region);
+                if (criteria.ship) parts.push(criteria.ship);
+                if (criteria.startDate) parts.push(new Intl.DateTimeFormat('de-DE', { month:'long', year:'numeric' }).format(new Date(`${criteria.startDate}T00:00:00`)));
+                return parts.join(' · ');
+            }
+
+            function applyChatCriteriaToPage(criteria) {
+                selectedRegions = criteria.region ? [criteria.region] : selectedRegions;
+                selectedShips = criteria.ship ? [criteria.ship] : selectedShips;
+                selectedPorts = [];
+                selectedDurations = [];
+                if (criteria.startDate) document.getElementById('startDate').value = criteria.startDate;
+                if (criteria.endDate) document.getElementById('endDate').value = criteria.endDate;
+                document.querySelectorAll('#regionChips .chip').forEach(chip => {
+                    chip.classList.toggle('active', selectedRegions.includes(chip.dataset.value));
+                });
+                updatePortFilter();
+                updateAvailableFilterOptions();
+                renderRoutes();
+            }
+
+            function renderChatResults(criteria) {
+                const matches = getMatchingChatRoutes(criteria);
+                results.replaceChildren();
+                results.hidden = false;
+                matches.slice(0, 3).forEach(({ route, departures }) => {
+                    const card = document.createElement('article');
+                    card.className = 'smart-chat__result';
+                    const title = document.createElement('strong');
+                    title.className = 'smart-chat__result-title';
+                    title.textContent = route.title;
+                    const meta = document.createElement('span');
+                    meta.className = 'smart-chat__result-meta';
+                    meta.textContent = `${route.schiff} · ab ${route.startPort} · ${route.nights} Nächte · nächste passende Abfahrt: ${departures[0].label}`;
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'smart-chat__result-button';
+                    button.textContent = 'Route auf der Seite anzeigen';
+                    button.addEventListener('click', () => {
+                        advisorState.focusRoute = route;
+                        const url = new URL(window.location.href);
+                        url.search = '';
+                        url.searchParams.set('route', route.id);
+                        window.location.href = url.toString();
+                    });
+                    card.append(title, meta, button);
+                    results.appendChild(card);
+                });
+                return matches;
+            }
+
+            function showChatSearch(criteria) {
+                const matches = renderChatResults(criteria);
+                advisorState.criteria = criteria;
+                const description = describeChatCriteria(criteria);
+                if (matches.length) {
+                    applyChatCriteriaToPage(criteria);
+                    addMessage(`Ich habe ${matches.length} passende ${matches.length === 1 ? 'Route' : 'Routen'}${description ? ` für ${description}` : ''} gefunden. Die ersten drei siehst du direkt hier.`);
+                    const shipChoices = [...new Set(matches.map(({ route }) => route.schiff))].slice(0, 2);
+                    setActions('Möchtest du weiter eingrenzen?', [
+                        ...shipChoices.map(ship => ({ label:ship, run:() => showChatSearch({ ...criteria, ship }) })),
+                        { label:'Freitext verfeinern', run:askForRouteQuery },
+                        { label:'Beratung zu diesen Routen', run:() => finishWithContact('Wir beraten dich gern zu diesen passenden Routen und prüfen die besten Termine.') }
+                    ]);
+                } else {
+                    addMessage(`Für${description ? ` ${description}` : ' diese Suche'} finde ich aktuell keine exakte Route. Unser Team kann gern Alternativen oder weitere Termine prüfen.`);
+                    setActions('Wie möchtest du weitergehen?', [
+                        { label:'Suche anders formulieren', run:askForRouteQuery },
+                        { label:'Persönliche Alternativen anfragen', run:() => finishWithContact('Wir suchen gern persönlich nach einer passenden Alternative.') },
+                        { label:'Neue Suche starten', run:startRouteFinder }
+                    ]);
+                }
+            }
+
+            function askForRouteQuery() {
+                askForText(
+                    'Schreib deinen Wunsch einfach so, wie du ihn sagen würdest – zum Beispiel: „Karibik Mai 2027 mit der World America“.',
+                    'Reiseziel, Monat/Jahr, Schiff …',
+                    answer => {
+                        if (!answer) {
+                            addMessage('Bitte nenne mindestens ein Reiseziel, einen Zeitraum oder ein Schiff.', true);
+                            askForRouteQuery();
+                            return;
+                        }
+                        addMessage(answer, true);
+                        const criteria = parseRouteRequest(answer);
+                        if (!criteria.region && !criteria.ship && !criteria.startDate) {
+                            advisorState.details = answer;
+                            addMessage('Ich habe den Wunsch notiert. Damit ich ihn exakt einordnen kann, hilft mir noch ein Reiseziel, ein Monat/Jahr oder ein Schiff.');
+                            setActions('Was passt?', [
+                                { label:'Karibik', run:() => showChatSearch({ ...criteria, region:'Karibik & Antillen' }) },
+                                { label:'Mittelmeer', run:() => showChatSearch({ ...criteria, region:'Mittelmeer' }) },
+                                { label:'Persönlich beraten lassen', run:() => finishWithContact('Wir klären deine Wünsche gern direkt persönlich mit dir.') }
+                            ]);
+                            return;
+                        }
+                        showChatSearch(criteria);
+                    }
+                );
+            }
+
             function buildContactMessage() {
                 const parts = ['Hallo Core Cruises, ich wünsche eine persönliche Beratung zu einer Kreuzfahrtroute.'];
                 if (advisorState.goal) parts.push(`Anliegen: ${advisorState.goal}.`);
@@ -6474,14 +6650,27 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 );
             }
 
-            function startRouteFinder() {
-                advisorState.goal = 'Ich möchte eine passende Kreuzfahrtroute finden';
+            function askForRoutePriority() {
                 addMessage('Worauf soll ich bei deiner Route zuerst achten?');
                 setActions('Deine Priorität', [
                     { label: 'Reiseziel / Route', run: () => { advisorState.priority = 'ein passendes Reiseziel und eine schöne Route'; askForWishDetails(); } },
                     { label: 'Reisezeitraum', run: () => { advisorState.priority = 'der passende Reisezeitraum'; askForWishDetails(); } },
                     { label: 'Reisedauer', run: () => { advisorState.priority = 'die ideale Reisedauer'; askForWishDetails(); } },
                     { label: 'Passendes Schiff', run: () => { advisorState.priority = 'ein passendes Schiff und Bord-Erlebnis'; askForWishDetails(); } }
+                ]);
+            }
+
+            function startRouteFinder() {
+                advisorState.goal = 'Ich möchte eine passende Kreuzfahrtroute finden';
+                results.hidden = true;
+                results.replaceChildren();
+                addMessage('Ich kann dir direkt passende Routen zeigen. Wähle ein Reiseziel oder schreib deinen Wunsch frei hinein.');
+                setActions('Wohin soll die Reise gehen?', [
+                    { label: 'Karibik', run: () => showChatSearch({ region:'Karibik & Antillen', ship:'', startDate:'', endDate:'' }) },
+                    { label: 'Mittelmeer', run: () => showChatSearch({ region:'Mittelmeer', ship:'', startDate:'', endDate:'' }) },
+                    { label: 'Nordeuropa', run: () => showChatSearch({ region:'Nordeuropa', ship:'', startDate:'', endDate:'' }) },
+                    { label: 'Freitext oder anderes Ziel', run: askForRouteQuery },
+                    { label: 'Ich möchte mich beraten lassen', run: askForRoutePriority }
                 ]);
             }
 
@@ -6535,6 +6724,8 @@ endDateInput.addEventListener('change', handleDateUpdate);
             function startConversation() {
                 advisorState = {};
                 messages.replaceChildren();
+                results.replaceChildren();
+                results.hidden = true;
                 const sharedRoute = getSharedRoute();
                 if (sharedRoute) {
                     advisorState.focusRoute = sharedRoute;
