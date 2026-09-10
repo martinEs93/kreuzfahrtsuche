@@ -5499,36 +5499,40 @@
    renderRoutes();
 
    const startDateInput = document.getElementById('startDate');
-   const endDateInput = document.getElementById('endDate');
-   const todayISO = getTodayISO();
+const endDateInput = document.getElementById('endDate');
 
-   startDateInput.min = todayISO;
-   endDateInput.min = todayISO;
+function syncDateConstraints() {
+    const todayISO = getTodayISO();
+    const startVal = startDateInput.value;
 
-   function handleStartDateUpdate(e) {
-       const startVal = e.target.value;
+    startDateInput.min = todayISO;
+    endDateInput.min = startVal && startVal >= todayISO ? startVal : todayISO;
 
-       if (startVal) {
-           endDateInput.min = startVal;
+    // Manuell eingegebene vergangene Abreise korrigieren
+    if (startVal && startVal < todayISO) {
+        startDateInput.value = todayISO;
+    }
 
-           if (endDateInput.value && endDateInput.value < startVal) {
-               endDateInput.value = startVal;
-           }
-       } else {
-           endDateInput.min = todayISO;
-       }
+    // „Bis“ darf nie vor „Von“ liegen
+    if (endDateInput.value && endDateInput.value < endDateInput.min) {
+        endDateInput.value = endDateInput.min;
+    }
+}
 
-       updateAvailableFilterOptions();
-       renderRoutes();
-   }
+function handleDateUpdate() {
+    syncDateConstraints();
+    updateAvailableFilterOptions();
+    renderRoutes();
+}
 
-   startDateInput.addEventListener('change', handleStartDateUpdate);
+syncDateConstraints();
 
-   endDateInput.addEventListener('change', () => {
-       updateAvailableFilterOptions();
-       renderRoutes();
-   });
-
+// `input` ist für mobile Datumsauswahl entscheidend,
+// `change` bleibt als Absicherung für Desktop/Browservarianten.
+startDateInput.addEventListener('input', handleDateUpdate);
+startDateInput.addEventListener('change', handleDateUpdate);
+endDateInput.addEventListener('input', handleDateUpdate);
+endDateInput.addEventListener('change', handleDateUpdate);
    document.getElementById('sortRoutes').addEventListener('change', () => renderRoutes());
 
    const backToTop = document.getElementById('backToTop');
