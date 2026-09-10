@@ -274,6 +274,9 @@
         /* Persönliche Beratung – Chatfenster */
         .back-to-top { bottom:92px; }
         .consultation-chat { position:fixed; right:22px; bottom:22px; z-index:10000; display:flex; flex-direction:column; align-items:flex-end; gap:10px; pointer-events:auto; }
+        /* Der unsichtbare, geschlossene Dialog darf keine Klicks auf der Seite abfangen. */
+        .consultation-chat:not(.is-open) { pointer-events:none; }
+        .consultation-chat:not(.is-open) .consultation-chat__toggle { pointer-events:auto; }
         .consultation-chat__panel { width:min(360px, calc(100vw - 32px)); padding:18px; border:1px solid rgba(0,51,102,.12); border-radius:16px; background:#fff; box-shadow:0 12px 32px rgba(10,26,47,.22); transform:translateY(12px) scale(.97); opacity:0; visibility:hidden; transition:opacity .25s ease, transform .25s ease, visibility .25s; }
         .consultation-chat.is-open .consultation-chat__panel { transform:translateY(0) scale(1); opacity:1; visibility:visible; }
         .consultation-chat__header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; color:var(--primary); }
