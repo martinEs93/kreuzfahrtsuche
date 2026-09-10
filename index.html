@@ -292,6 +292,40 @@
             .consultation-chat { right:15px; bottom:15px; }
             .back-to-top { right:15px; bottom:82px; }
         }
+
+        /* Intelligenter Beratungs-Concierge */
+        .consultation-chat__panel { padding:0; overflow:hidden; }
+        .smart-chat__header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 18px 12px; color:#fff; background:linear-gradient(135deg, #003366, #0A1A2F); }
+        .smart-chat__identity { display:flex; align-items:center; gap:9px; min-width:0; }
+        .smart-chat__identity strong { display:block; font-size:14px; }
+        .smart-chat__identity span { display:block; margin-top:1px; opacity:.78; font-size:11px; }
+        .smart-chat__logo { background:#fff; }
+        .smart-chat__close { display:grid; place-items:center; flex:0 0 auto; width:30px; height:30px; padding:0; border:0; border-radius:50%; color:#fff; background:rgba(255,255,255,.13); cursor:pointer; font-size:17px; }
+        .smart-chat__close:hover { background:rgba(255,255,255,.24); }
+        .smart-chat__messages { display:flex; flex-direction:column; gap:9px; max-height:286px; min-height:155px; padding:15px 16px 8px; overflow-y:auto; background:#f8fafc; scroll-behavior:smooth; }
+        .smart-chat__message { display:flex; gap:8px; align-items:flex-end; max-width:100%; }
+        .smart-chat__message--user { justify-content:flex-end; }
+        .smart-chat__avatar { flex:0 0 auto; width:29px; height:29px; border-radius:50%; object-fit:cover; background:#e8f0f7; }
+        .smart-chat__bubble { max-width:calc(100% - 38px); margin:0; padding:10px 12px; border-radius:5px 13px 13px; color:#173b60; background:#eaf3fb; font-size:14px; font-weight:600; line-height:1.42; white-space:pre-line; }
+        .smart-chat__message--user .smart-chat__bubble { border-radius:13px 5px 13px 13px; color:#fff; background:#003366; }
+        .smart-chat__suggestion { padding:8px 16px 13px; background:#f8fafc; }
+        .smart-chat__suggestion-label { display:block; margin:0 0 7px; color:#64748b; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; }
+        .smart-chat__actions { display:flex; flex-wrap:wrap; gap:7px; }
+        .smart-chat__action { flex:1 1 calc(50% - 4px); min-width:130px; padding:9px 10px; border:1px solid #c8d9e8; border-radius:8px; color:#003366; background:#fff; cursor:pointer; font:inherit; font-size:12px; font-weight:700; line-height:1.25; transition:background .18s, color .18s, transform .18s; }
+        .smart-chat__action:hover { color:#fff; background:#003366; border-color:#003366; transform:translateY(-1px); }
+        .smart-chat__form { display:flex; gap:7px; padding:0 16px 12px; background:#f8fafc; }
+        .smart-chat__form[hidden] { display:none; }
+        .smart-chat__input { flex:1; min-width:0; padding:10px 11px; border:1px solid #c8d9e8; border-radius:8px; color:#173b60; background:#fff; font:inherit; font-size:13px; }
+        .smart-chat__submit { display:grid; place-items:center; width:42px; padding:0; border:0; border-radius:8px; color:#fff; background:#003366; cursor:pointer; }
+        .smart-chat__submit:hover { background:#002244; }
+        .smart-chat__note { margin:0; padding:0 16px 11px; color:#718096; background:#f8fafc; font-size:10px; line-height:1.35; }
+        .smart-chat__contact { display:grid; grid-template-columns:1fr 1fr; gap:7px; padding:11px 16px; border-top:1px solid #e2e8f0; background:#fff; }
+        .smart-chat__contact-link { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:38px; border-radius:8px; color:#fff; text-decoration:none; font-size:12px; font-weight:700; }
+        .smart-chat__contact-link--whatsapp { background:#25D366; }
+        .smart-chat__contact-link--mail { background:#4a5568; }
+        .smart-chat__utility { display:flex; justify-content:center; padding:0 16px 12px; background:#fff; }
+        .smart-chat__restart { padding:0; border:0; color:#587087; background:transparent; cursor:pointer; font:inherit; font-size:11px; text-decoration:underline; }
+        @media (max-width:768px) { .smart-chat__messages { max-height:250px; } }
     </style>
 </head>
 <body>
@@ -433,27 +467,30 @@
 
     <aside class="consultation-chat" id="consultationChat" aria-label="Persönliche Beratung">
         <div class="consultation-chat__panel" id="consultationChatPanel" role="dialog" aria-modal="false" aria-labelledby="consultationChatTitle">
-            <div class="consultation-chat__header">
-                <div class="consultation-chat__brand" id="consultationChatTitle">
+            <div class="smart-chat__header">
+                <div class="smart-chat__identity" id="consultationChatTitle">
                     <img class="consultation-chat__logo" src="favicon.png" alt="">
-                    Core Cruises
+                    <div><strong>Core Cruises</strong><span>Dein persönlicher Reiseberater</span></div>
                 </div>
-                <button class="consultation-chat__close" id="consultationChatClose" type="button" aria-label="Beratungsfenster schließen">
+                <button class="smart-chat__close" id="consultationChatClose" type="button" aria-label="Beratungsfenster schließen">
                     <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                 </button>
             </div>
-            <div class="consultation-chat__message-row">
-                <img class="consultation-chat__message-avatar" src="favicon.png" alt="Core Cruises">
-                <p class="consultation-chat__message">Brauchst du Unterstützung bei der Wahl deiner Route?</p>
+            <div class="smart-chat__messages" id="smartChatMessages" aria-live="polite" aria-label="Beratungschat"></div>
+            <div class="smart-chat__suggestion" id="smartChatSuggestion">
+                <span class="smart-chat__suggestion-label">Wähle, wobei ich helfen darf</span>
+                <div class="smart-chat__actions" id="smartChatActions"></div>
             </div>
-            <div class="consultation-chat__actions">
-                <a class="consultation-chat__action consultation-chat__action--whatsapp" id="consultationChatWhatsApp" href="#" target="_blank" rel="noopener">
-                    <i class="fa-brands fa-whatsapp" aria-hidden="true"></i> WhatsApp
-                </a>
-                <a class="consultation-chat__action consultation-chat__action--mail" id="consultationChatMail" href="#">
-                    <i class="fa-regular fa-envelope" aria-hidden="true"></i> E-Mail
-                </a>
+            <form class="smart-chat__form" id="smartChatForm" hidden>
+                <input class="smart-chat__input" id="smartChatInput" type="text" maxlength="280" autocomplete="off">
+                <button class="smart-chat__submit" type="submit" aria-label="Antwort senden"><i class="fa-solid fa-arrow-up" aria-hidden="true"></i></button>
+            </form>
+            <p class="smart-chat__note">Deine Eingabe wird nicht gespeichert. Erst beim Kontakt per WhatsApp oder E-Mail wird sie an uns übermittelt.</p>
+            <div class="smart-chat__contact">
+                <a class="smart-chat__contact-link smart-chat__contact-link--whatsapp" id="consultationChatWhatsApp" href="#" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i> WhatsApp</a>
+                <a class="smart-chat__contact-link smart-chat__contact-link--mail" id="consultationChatMail" href="#"><i class="fa-regular fa-envelope" aria-hidden="true"></i> E-Mail</a>
             </div>
+            <div class="smart-chat__utility"><button class="smart-chat__restart" id="smartChatRestart" type="button">Beratung neu starten</button></div>
         </div>
         <button class="consultation-chat__toggle" id="consultationChatToggle" type="button" aria-label="Persönliche Beratung öffnen" aria-expanded="false">
             <i class="fa-regular fa-comment-dots" aria-hidden="true"></i>
@@ -6222,103 +6259,4 @@ endDateInput.addEventListener('change', handleDateUpdate);
 
         function shareByEmail(id) {
             const route = routesData.find(r => r.id === id);
-            const subject = `Kreuzfahrt-Route: ${route.title}`;
-            const body = `Schau dir diese Kreuzfahrt-Route an:\n\n${getRouteShareText(route)}\n\n${getRouteShareUrl(route)}`;
-            window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        }
-
-        async function copyRouteLink(id) {
-            const route = routesData.find(r => r.id === id);
-            const text = `${getRouteShareText(route)}\n${getRouteShareUrl(route)}`;
-            try {
-                await navigator.clipboard.writeText(text);
-                setShareStatus(id, 'Link wurde kopiert.');
-            } catch (error) {
-                setShareStatus(id, 'Link konnte nicht automatisch kopiert werden.');
-            }
-        }
-
-        async function shareWithDevice(id) {
-            const route = routesData.find(r => r.id === id);
-            const shareData = { title: route.title, text: getRouteShareText(route), url: getRouteShareUrl(route) };
-            if (navigator.share) {
-                try {
-                    await navigator.share(shareData);
-                } catch (error) {
-                    // Abbrechen des Teilen-Dialogs ist keine Fehlermeldung.
-                }
-            } else {
-                await copyRouteLink(id);
-                setShareStatus(id, 'Link kopiert – bitte in Instagram oder einer anderen App einfügen.');
-            }
-        }
-
-        function sendWhatsApp(id) {
-            const route = routesData.find(r => r.id === id);
-            if (!route) return;
-
-            const departureDate = getSelectedDeparture(id);
-
-            const message = "Hallo! Ich habe Interesse an folgender Route:\n" +
-                            "*" + route.title + "*\n" +
-                            "Reisezeitraum: " + departureDate + "\n" +
-                            "Schiff: " + route.schiff + "\n" +
-                            "Hafen: " + route.startPort + "\n\n" +
-                            "Bitte um unverbindliche Beratung.";
-
-            window.open("https://wa.me/" + MY_PHONE_NUMBER + "?text=" + encodeURIComponent(message), '_blank');
-        }
-
-        function sendEmail(id) {
-            const route = routesData.find(r => r.id === id);
-            if (!route) return;
-
-            const departureDate = getSelectedDeparture(id);
-
-            const subject = "Anfrage zur Kreuzfahrt: " + route.title;
-            const body = "Hallo Team von corecruises.de,\n\n" +
-                         "ich habe Interesse an folgender Route:\n" +
-                         "- Route: " + route.title + "\n" +
-                         "- Gewünschter Reisezeitraum: " + departureDate + "\n" +
-                         "- Schiff: " + route.schiff + "\n" +
-                         "- Abfahrtshafen: " + route.startPort + "\n\n" +
-                         "Bitte senden Sie mir ein unverbindliches Angebot zu.\n\n" +
-                         "Viele Grüße";
-
-            const mailtoUrl = "mailto:" + MY_EMAIL +
-                              "?subject=" + encodeURIComponent(subject) +
-                              "&body=" + encodeURIComponent(body);
-
-            window.location.href = mailtoUrl;
-        }
-
-        // Beratungs-Chat: führt Interessierte direkt in die persönliche Beratung.
-        (function initConsultationChat() {
-            const chat = document.getElementById('consultationChat');
-            const toggle = document.getElementById('consultationChatToggle');
-            const close = document.getElementById('consultationChatClose');
-            const whatsapp = document.getElementById('consultationChatWhatsApp');
-            const mail = document.getElementById('consultationChatMail');
-            if (!chat || !toggle || !close || !whatsapp || !mail) return;
-
-            const message = 'Hallo Core Cruises, ich brauche Unterstützung bei der Wahl meiner Kreuzfahrtroute.';
-            whatsapp.href = `https://wa.me/${MY_PHONE_NUMBER}?text=${encodeURIComponent(message)}`;
-            mail.href = `mailto:${MY_EMAIL}?subject=${encodeURIComponent('Beratung zur Kreuzfahrtroute')}&body=${encodeURIComponent(message)}`;
-
-            function setOpen(isOpen) {
-                chat.classList.toggle('is-open', isOpen);
-                toggle.setAttribute('aria-expanded', String(isOpen));
-            }
-
-            toggle.addEventListener('click', () => setOpen(true));
-            close.addEventListener('click', () => setOpen(false));
-            document.addEventListener('keydown', event => {
-                if (event.key === 'Escape') setOpen(false);
-            });
-
-            // Kurz nach dem Laden sichtbar, damit es nicht vom Seitenaufbau ablenkt.
-            window.setTimeout(() => setOpen(true), 1000);
-        })();
-    </script>
-</body>
-</html>
+            
