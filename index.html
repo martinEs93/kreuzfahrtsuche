@@ -561,7 +561,9 @@
         // Exakte Dauern können im Chat genannt werden, während die sichtbare
         // Auswahl weiterhin mit den vier vertrauten Dauerbereichen arbeitet.
         let chatExactNights = null;
-        const ROUTES_PER_PAGE = 12;
+        // Weniger Karten beim ersten Rendern: Das beschleunigt die Desktop-Ansicht
+        // spürbar; weitere Ergebnisse bleiben über „Weitere Routen laden“ erreichbar.
+        const ROUTES_PER_PAGE = 6;
         let visibleRoutes = ROUTES_PER_PAGE;
         const FAVORITES_STORAGE_KEY = 'corecruises-route-favorites';
         let showingFavorites = false;
