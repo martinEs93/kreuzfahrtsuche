@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://www.corecruises.de" crossorigin>
     <title>Kreuzfahrtrouten finden | Core Cruises</title>
     <link rel="icon" href="favicon.png" type="image/png">
     <link rel="dns-prefetch" href="//i.postimg.cc">
@@ -6004,11 +6005,40 @@ endDateInput.addEventListener('change', handleDateUpdate);
             }));
         }
 
+        let routeImageObserver = null;
+
+        function loadRouteImage(image) {
+            const source = image.dataset.src;
+            if (!source || image.getAttribute('src')) return;
+            image.src = source;
+            image.removeAttribute('data-src');
+        }
+
+        if ('IntersectionObserver' in window) {
+            routeImageObserver = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (!entry.isIntersecting) return;
+                    routeImageObserver.unobserve(entry.target);
+                    loadRouteImage(entry.target);
+                });
+            }, { rootMargin:'700px 0px' });
+        }
+
+        function scheduleRouteImage(image, isPriority) {
+            if (isPriority || !routeImageObserver) {
+                loadRouteImage(image);
+                return;
+            }
+            routeImageObserver.observe(image);
+        }
+
         function renderRoutes(resetPagination = true) {
             // Entfernte Routen bleiben nicht als Favorit zurück.
             pruneFavoriteRoutes();
 
             const grid = document.getElementById('routeGrid');
+            // Beim Umfiltern keine Bilder weiterladen, deren Karten entfernt wurden.
+            routeImageObserver?.disconnect();
             grid.innerHTML = '';
             const sharedRouteId = Number(new URLSearchParams(window.location.search).get('route'));
             const isSharedRoute = Number.isInteger(sharedRouteId) && sharedRouteId > 0;
@@ -6097,8 +6127,9 @@ endDateInput.addEventListener('change', handleDateUpdate);
                
                 const validDeps = getValidDepartures(route, startVal, endVal)
                     .sort((a, b) => a.start.localeCompare(b.start));
-                const imageLoading = index < 3 ? 'eager' : 'lazy';
-                const imagePriority = index === 0 ? 'high' : 'auto';
+                const isPriorityImage = index < 3;
+                const imageLoading = isPriorityImage ? 'eager' : 'lazy';
+                const imagePriority = isPriorityImage ? 'high' : 'auto';
 
                 validDeps.forEach((dep, idx) => {
                     const isChecked = idx === 0 ? 'checked' : '';
@@ -6120,7 +6151,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
                         </div>
                     </div>
                     <div class="image-container is-loading">
-                        <img src="${route.image}" alt="${route.title}" width="640" height="400" loading="${imageLoading}" decoding="async" fetchpriority="${imagePriority}">
+                        <img data-src="${route.image}" alt="${route.title}" width="640" height="400" loading="${imageLoading}" decoding="async" fetchpriority="${imagePriority}">
                     </div>
                     <div class="route-details-short">
                         <div class="detail-row"><span class="detail-label"><i class="fa-solid fa-ship" aria-hidden="true"></i> Schiff:</span><span class="detail-value">${route.schiff}</span></div>
@@ -6185,9 +6216,9 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 const image = card.querySelector('.image-container img');
                 image.addEventListener('load', () => handleImageLoad(image), { once:true });
                 image.addEventListener('error', () => handleImageError(image), { once:true });
-                if (image.complete && image.naturalWidth > 0) handleImageLoad(image);
-
                 grid.appendChild(card);
+                scheduleRouteImage(image, isPriorityImage);
+                if (image.complete && image.naturalWidth > 0) handleImageLoad(image);
             });
 
             if (filtered.length > visibleRoutes) {
