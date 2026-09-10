@@ -6663,10 +6663,13 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 };
             }
 
-            function resolvePorts(text) {
+            function resolvePorts(text, options = {}) {
                 const normalized = normalizeChatText(text);
                 const hasDepartureCue = /\b(?:ab|von|abfahrt|abfahrtshafen|start|starten)\b/.test(normalized);
-                if (!hasDepartureCue) return [];
+                // In einer freien Unterhaltung ist ein Ortsname nicht automatisch ein
+                // Abfahrtshafen. Im expliziten Hafen-Schritt darf er dagegen auch ohne
+                // "ab" als vollständige Antwort verstanden werden.
+                if (!hasDepartureCue && !options.allowBarePort) return [];
                 return unique(PORT_CATALOG.flatMap(entry => entry.aliases.some(alias => hasPhrase(normalized, alias)) ? [entry.port] : []));
             }
 
@@ -6824,7 +6827,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
             function emptyCriteria() {
                 return {
                     regions:[], regionLabel:'', ports:[], ships:[], durations:[], exactNights:null,
-                    startDate:'', endDate:'', datePrecision:'', party:'', preferences:[], original:''
+                    startDate:'', endDate:'', datePrecision:'', party:'', preferences:[], openFields:[], original:''
                 };
             }
 
@@ -6837,8 +6840,20 @@ endDateInput.addEventListener('change', handleDateUpdate);
                     ships:unique(criteria.ships),
                     durations:unique(criteria.durations),
                     preferences:unique(criteria.preferences),
+                    openFields:unique(criteria.openFields),
                     exactNights:Number.isInteger(criteria.exactNights) ? criteria.exactNights : null
                 };
+            }
+
+            function markFieldOpen(criteria, field) {
+                return normalizeCriteria({
+                    ...criteria,
+                    openFields:unique([...(criteria.openFields || []), field])
+                });
+            }
+
+            function clearOpenField(criteria, field) {
+                return (criteria.openFields || []).filter(openField => openField !== field);
             }
 
             function getCurrentSearchCriteria() {
@@ -6856,6 +6871,13 @@ endDateInput.addEventListener('change', handleDateUpdate);
             function mergeCriteria(base, update) {
                 const current = normalizeCriteria(base);
                 const incoming = normalizeCriteria(update);
+                const openFields = new Set(current.openFields);
+                if (incoming.regions.length) openFields.delete('region');
+                if (incoming.ports.length) openFields.delete('port');
+                if (incoming.ships.length) openFields.delete('ship');
+                if (incoming.durations.length || incoming.exactNights !== null) openFields.delete('duration');
+                if (incoming.startDate || incoming.endDate) openFields.delete('time');
+                incoming.openFields.forEach(field => openFields.add(field));
                 return normalizeCriteria({
                     ...current,
                     // Eine explizit genannte neue Dimension ersetzt nur diese
@@ -6871,6 +6893,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
                     datePrecision:incoming.datePrecision || current.datePrecision,
                     party:incoming.party || current.party,
                     preferences:incoming.preferences.length ? incoming.preferences : current.preferences,
+                    openFields:[...openFields],
                     original:incoming.original || current.original
                 });
             }
@@ -7179,7 +7202,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
                     const option = allDurationsList.find(entry => entry.value === value);
                     return {
                         label:option?.label || value,
-                        run:() => guideSearch({ ...criteria, durations:[value], exactNights:null }, mode)
+                        run:() => guideSearch({ ...criteria, durations:[value], exactNights:null, openFields:clearOpenField(criteria, 'duration') }, mode)
                     };
                 });
                 choices.push({
@@ -7203,7 +7226,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
                         }
                     )
                 });
-                choices.push({ label:'Bei der Dauer bin ich offen', run:() => guideSearch(criteria, mode) });
+                choices.push({ label:'Bei der Dauer bin ich offen', run:() => guideSearch(markFieldOpen(criteria, 'duration'), mode) });
                 setActions('Reisedauer auswählen', addShowResultsChoice(choices, criteria));
             }
 
@@ -7220,7 +7243,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 addMessage('Welcher Abfahrtshafen ist für dich am bequemsten?' + moreHint);
                 const choices = buttonPorts.map(port => ({
                     label:'Ab ' + port,
-                    run:() => guideSearch({ ...criteria, ports:[port] }, mode)
+                    run:() => guideSearch({ ...criteria, ports:[port], openFields:clearOpenField(criteria, 'port') }, mode)
                 }));
                 choices.push({
                     label:'Hafen frei eingeben',
@@ -7233,17 +7256,17 @@ endDateInput.addEventListener('change', handleDateUpdate);
                                 return;
                             }
                             addMessage(answer, true);
-                            const parsed = parseRouteRequest('ab ' + answer);
-                            if (!parsed.ports.length) {
+                            const ports = resolvePorts(answer, { allowBarePort:true });
+                            if (!ports.length) {
                                 addMessage('Diesen Abfahrtshafen finde ich im aktuellen Routenprogramm nicht eindeutig. Wähle gern einen Hafen aus der Liste.');
                                 askForPort(criteria, mode);
                                 return;
                             }
-                            guideSearch({ ...criteria, ports:parsed.ports }, mode);
+                            guideSearch({ ...criteria, ports, openFields:clearOpenField(criteria, 'port') }, mode);
                         }
                     )
                 });
-                choices.push({ label:'Hafen ist mir offen', run:() => guideSearch(criteria, mode) });
+                choices.push({ label:'Hafen ist mir offen', run:() => guideSearch(markFieldOpen(criteria, 'port'), mode) });
                 setActions('Abfahrtshafen wählen', addShowResultsChoice(choices, criteria));
             }
 
@@ -7260,7 +7283,7 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 addMessage('Hast du ein Wunschschiff oder ist dir das Bord-Erlebnis offen?' + moreHint);
                 const choices = buttonShips.map(ship => ({
                     label:ship,
-                    run:() => guideSearch({ ...criteria, ships:[ship] }, mode)
+                    run:() => guideSearch({ ...criteria, ships:[ship], openFields:clearOpenField(criteria, 'ship') }, mode)
                 }));
                 choices.push({
                     label:'Schiff frei eingeben',
@@ -7278,16 +7301,16 @@ endDateInput.addEventListener('change', handleDateUpdate);
                                 addMessage('Dieses Schiff konnte ich nicht sicher zuordnen. Unser Team kann es gern persönlich prüfen.');
                                 setActions('Wie möchtest du weitergehen?', [
                                     { label:'Anderes Schiff auswählen', run:() => askForShip(criteria, mode) },
-                                    { label:'Ohne Wunschschiff weiter', run:() => guideSearch(criteria, mode) },
+                                    { label:'Ohne Wunschschiff weiter', run:() => guideSearch(markFieldOpen(criteria, 'ship'), mode) },
                                     { label:'Persönlich prüfen lassen', run:() => finishWithContact('Ich halte dein Wunschschiff fest; unser Team prüft die passende Route gern persönlich.') }
                                 ]);
                                 return;
                             }
-                            guideSearch({ ...criteria, ships:parsed.ships }, mode);
+                            guideSearch({ ...criteria, ships:parsed.ships, openFields:clearOpenField(criteria, 'ship') }, mode);
                         }
                     )
                 });
-                choices.push({ label:'Schiff ist mir offen', run:() => guideSearch(criteria, mode) });
+                choices.push({ label:'Schiff ist mir offen', run:() => guideSearch(markFieldOpen(criteria, 'ship'), mode) });
                 setActions('Schiff auswählen', addShowResultsChoice(choices, criteria));
             }
 
@@ -7342,19 +7365,19 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 }
 
                 const durationValues = getDistinctDurationValues(matches);
-                if (!normalized.durations.length && normalized.exactNights === null && durationValues.length > 1) {
+                if (!normalized.durations.length && normalized.exactNights === null && !normalized.openFields.includes('duration') && durationValues.length > 1) {
                     askForDuration(normalized, mode);
                     return;
                 }
 
                 const ports = getDistinctPorts(matches);
-                if (!normalized.ports.length && ports.length > 1) {
+                if (!normalized.ports.length && !normalized.openFields.includes('port') && ports.length > 1) {
                     askForPort(normalized, mode);
                     return;
                 }
 
                 const ships = getDistinctShips(matches);
-                if (!normalized.ships.length && ships.length > 1) {
+                if (!normalized.ships.length && !normalized.openFields.includes('ship') && ships.length > 1) {
                     askForShip(normalized, mode);
                     return;
                 }
