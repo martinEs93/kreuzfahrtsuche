@@ -6603,8 +6603,8 @@ endDateInput.addEventListener('change', handleDateUpdate);
                 });
             }
 
-            const SHIP_CATALOG = getShipCatalog();
-            const PORT_CATALOG = unique(routesData.map(route => route.startPort))
+            let SHIP_CATALOG = getShipCatalog();
+            let PORT_CATALOG = unique(routesData.map(route => route.startPort))
                 .map(port => {
                     const normalized = normalizeChatText(port);
                     const firstWord = normalized.split(' ')[0];
@@ -7741,5 +7741,36 @@ endDateInput.addEventListener('change', handleDateUpdate);
         })();
 
     </script>
+
+<!-- Core Cruises Backoffice: published routes replace local fallback data when available. -->
+<script>
+(() => {
+  const API = 'https://api.corecruises.info/v1';
+  window.addEventListener('DOMContentLoaded', async () => {
+    try {
+      const response = await fetch(API + '/routes', { headers: { Accept: 'application/json' }, cache: 'no-store' });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const liveRoutes = await response.json();
+      if (!Array.isArray(liveRoutes) || liveRoutes.length === 0) return;
+      liveRoutes.forEach(route => { route.shipInfo = shipInfoByShip[route.schiff] || route.shipInfo; });
+      routesData.splice(0, routesData.length, ...liveRoutes);
+      SHIP_CATALOG = getShipCatalog();
+      PORT_CATALOG = unique(routesData.map(route => route.startPort))
+        .map(port => {
+          const normalized = normalizeChatText(port);
+          const firstWord = normalized.split(' ')[0];
+          return { port, aliases: unique([normalized, normalized.split(' ').length > 1 && firstWord.length >= 5 ? firstWord : '']).filter(Boolean) };
+        })
+        .sort((a, b) => b.aliases[0].length - a.aliases[0].length);
+      updatePortFilter();
+      updateAvailableFilterOptions();
+      renderRoutes();
+      console.info('Core Cruises Backoffice: ' + liveRoutes.length + ' veröffentlichte Routen geladen.');
+    } catch (error) {
+      console.info('Core Cruises Backoffice: lokaler Routen-Fallback aktiv.', error);
+    }
+  });
+})();
+</script>
 </body>
 </html>
